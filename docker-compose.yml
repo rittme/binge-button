@@ -2,7 +2,7 @@ version: '3.8'
 services:
   comfort-player:
     image: ghcr.io/rittme/comfort-player:latest
-    container_name: comfort-player-backend
+    container_name: comfort-player
     ports:
       - "8080:8080"
     environment:
