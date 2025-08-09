@@ -1,0 +1,63 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+README.md
+*.md
+
+# Development files
+.env
+.env.local
+.env.*.local
+
+# Build artifacts
+main
+main.exe
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test files
+*_test.go
+*.test
+test_*
+*_test
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Scripts (not needed in container)
+*.sh
+init.sh
+start_server.sh
+stop_server.sh
+test_api.sh
+
+# Media and data (will be mounted as volumes)
+media/
+data/
+shows/
+
+# Docker files
+Dockerfile
+.dockerignore
+docker-compose.yml
