@@ -22,16 +22,16 @@ docker-compose up -d
 
 ```bash
 # Build the image
-docker build -t comfort-player-backend ./backend
+docker build -t comfort-player ./backend
 
 # Run the container
 docker run -d \
-  --name comfort-player-backend \
+  --name comfort-player \
   -p 8080:8080 \
   -v $(pwd)/media:/app/media:ro \
   -v $(pwd)/data:/app/data \
   -e API_KEY=your-secret-token \
-  comfort-player-backend
+  comfort-player
 ```
 
 ## Configuration
@@ -78,11 +78,6 @@ comfort-player/
 
 ```bash
 # Copy environment template
-cp .env.example .env
-
-# Edit configuration
-nano .env
-
 # Start services
 docker-compose up -d
 
@@ -90,20 +85,7 @@ docker-compose up -d
 docker-compose ps
 ```
 
-### 2. Production Setup
-
-```bash
-# Create production environment file
-cp .env.example .env.production
-
-# Edit with production values
-nano .env.production
-
-# Run with production config
-docker-compose --env-file .env.production up -d
-```
-
-### 3. Updating the Service
+### 2. Updating the Service
 
 ```bash
 # Pull latest changes
@@ -124,7 +106,7 @@ The container includes health checks that verify:
 Check health status:
 ```bash
 docker-compose ps
-docker inspect comfort-player-backend | grep -A 10 Health
+docker inspect comfort-player | grep -A 10 Health
 ```
 
 ## Troubleshooting
@@ -140,7 +122,7 @@ docker inspect comfort-player-backend | grep -A 10 Health
 2. **Container won't start**
    ```bash
    # Check logs
-   docker-compose logs comfort-player-backend
+   docker-compose logs comfort-player
    
    # Check configuration
    docker-compose config
@@ -149,20 +131,20 @@ docker inspect comfort-player-backend | grep -A 10 Health
 3. **Media files not found**
    ```bash
    # Verify volume mounts
-   docker exec comfort-player-backend ls -la /app/media
+   docker exec comfort-player ls -la /app/media
    ```
 
 ### Useful Commands
 
 ```bash
 # View container logs
-docker-compose logs -f comfort-player-backend
+docker-compose logs -f comfort-player
 
 # Execute commands in container
-docker exec -it comfort-player-backend sh
+docker exec -it comfort-player sh
 
 # Check container resources
-docker stats comfort-player-backend
+docker stats comfort-player
 
 # Clean up
 docker-compose down
