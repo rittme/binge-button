@@ -5,21 +5,41 @@ on:
     branches: [ "master" ]
     paths:
       - "backend/**"
+      - ".github/workflows/**"
   pull_request:
     branches: [ "master" ]
     paths:
       - "backend/**"
-
+      - ".github/workflows/**"
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    - name: Build the Docker image
-      run: docker build --file backend/Dockerfile --tag rittme/comfort-player:$(date +%s) ./backend
-    - name: Tag latest image
-      run: docker tag rittme/comfort-player:$(date +%s) rittme/comfort-player:latest
-    - name: Push image
-      run: docker push rittme/comfort-player:$(date +%s)
-    - name: Push latest image
-      run: docker push rittme/comfort-player:latest
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate image tag
+        id: vars
+        run: echo "tag=$(date +'%Y%m%d%H%M')" >> $GITHUB_OUTPUT
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.actor }}/comfort-player:latest
+            ghcr.io/${{ github.actor }}/comfort-player:${{ steps.vars.outputs.tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
