@@ -22,7 +22,11 @@ FROM alpine:latest
 # Install ca-certificates for HTTPS requests
 RUN apk --no-cache add ca-certificates tzdata
 
-LABEL author="Bernardo Rittmeyer"
+LABEL org.opencontainers.image.authors="Bernardo Rittmeyer"
+LABEL org.opencontainers.image.source=https://github.com/rittme/comfort-player
+LABEL org.opencontainers.image.description="Comfort Player Server"
+LABEL org.opencontainers.image.licenses=MIT
+
 
 # Create non-root user for security
 RUN addgroup -g 1000 appuser && \
