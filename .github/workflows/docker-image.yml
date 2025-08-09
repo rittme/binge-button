@@ -1,0 +1,25 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches: [ "master" ]
+    paths:
+      - "backend/**"
+  pull_request:
+    branches: [ "master" ]
+    paths:
+      - "backend/**"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Build the Docker image
+      run: docker build . --file backend/Dockerfile --tag rittme/comfort-player:$(date +%s)
+    - name: Tag latest image
+      run: docker tag rittme/comfort-player:$(date +%s) rittme/comfort-player:latest
+    - name: Push image
+      run: docker push rittme/comfort-player:$(date +%s)
+    - name: Push latest image
+      run: docker push rittme/comfort-player:latest
