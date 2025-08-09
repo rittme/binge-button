@@ -32,6 +32,7 @@ func NewStateService(stateFile string) *StateService {
 func (s *StateService) GetState() models.ServerState {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
+	loadState()
 	return s.state
 }
 
