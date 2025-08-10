@@ -32,7 +32,6 @@ func NewStateService(stateFile string) *StateService {
 func (s *StateService) GetState() models.ServerState {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
-	s.loadState()
 	return s.state
 }
 
@@ -80,5 +79,9 @@ func (s *StateService) loadState() {
 		log.Printf("loadState: State file not found, initializing with default values")
 		// Initialize with default values
 		s.state = models.ServerState{}
+		err := utils.WriteJSON(s.stateFile, s.state)
+		if err != nil {
+			log.Printf("UpdateState: Error initializing state to file: %v", err)
+		}
 	}
 }
