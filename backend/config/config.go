@@ -1,6 +1,7 @@
 package config
 
 import (
+	"log"
 	"os"
 	"path/filepath"
 )
@@ -26,7 +27,7 @@ func LoadConfig() *Config {
 	defaultSeasonsDir := filepath.Join(defaultMediaDir, "shows")
 	defaultStateFile := filepath.Join(cwd, "data", "state.json")
 	
-	return &Config{
+	config := &Config{
 		Port:              getEnv("PORT", "8080"),
 		MediaDir:          getEnv("MEDIA_DIR", defaultMediaDir),
 		SeasonsDir:        getEnv("SEASONS_DIR", defaultSeasonsDir),
@@ -35,6 +36,9 @@ func LoadConfig() *Config {
 		VideoFilePattern:  getEnv("VIDEO_FILE_PATTERN", "*.mp4,*.mkv,*.avi"),
 		SubtitleFilePattern: getEnv("SUBTITLE_FILE_PATTERN", "*.srt,*.vtt"),
 	}
+
+	log.Printf("%+v\n", config)
+	return config
 }
 
 // getEnv returns the value of an environment variable or a default value
