@@ -60,7 +60,26 @@
             android:paddingVertical="12dp"
             android:focusable="true"
             android:focusableInTouchMode="true"
+            android:nextFocusRight="@id/button_seek_backward"
+            android:nextFocusDown="@id/button_seek_backward" />
+
+        <Button
+            android:id="@+id/button_seek_backward"
+            style="?android:attr/buttonBarButtonStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="16dp"
+            android:text="@string/seek_backward"
+            android:background="@drawable/button_selector_tv"
+            android:textColor="@color/button_text"
+            android:textSize="24sp"
+            android:paddingHorizontal="24dp"
+            android:paddingVertical="12dp"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:nextFocusLeft="@id/button_previous_episode"
             android:nextFocusRight="@id/button_play_pause"
+            android:nextFocusUp="@id/button_previous_episode"
             android:nextFocusDown="@id/button_play_pause" />
 
         <Button
@@ -77,9 +96,28 @@
             android:paddingVertical="12dp"
             android:focusable="true"
             android:focusableInTouchMode="true"
-            android:nextFocusLeft="@id/button_previous_episode"
+            android:nextFocusLeft="@id/button_seek_backward"
+            android:nextFocusRight="@id/button_seek_forward"
+            android:nextFocusUp="@id/button_seek_backward"
+            android:nextFocusDown="@id/button_seek_forward" />
+
+        <Button
+            android:id="@+id/button_seek_forward"
+            style="?android:attr/buttonBarButtonStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="16dp"
+            android:text="@string/seek_forward"
+            android:background="@drawable/button_selector_tv"
+            android:textColor="@color/button_text"
+            android:textSize="24sp"
+            android:paddingHorizontal="24dp"
+            android:paddingVertical="12dp"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:nextFocusLeft="@id/button_play_pause"
             android:nextFocusRight="@id/button_next_episode"
-            android:nextFocusUp="@id/button_previous_episode"
+            android:nextFocusUp="@id/button_play_pause"
             android:nextFocusDown="@id/button_next_episode" />
 
         <Button
@@ -95,8 +133,8 @@
             android:paddingVertical="12dp"
             android:focusable="true"
             android:focusableInTouchMode="true"
-            android:nextFocusLeft="@id/button_play_pause"
-            android:nextFocusUp="@id/button_play_pause" />
+            android:nextFocusLeft="@id/button_seek_forward"
+            android:nextFocusUp="@id/button_seek_forward" />
 
     </LinearLayout>
 

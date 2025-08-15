@@ -1,7 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">BingeButton</string>
     <string name="start">Start</string>
     <string name="previous">⏮︎</string>
     <string name="next">⏭︎</string>
     <string name="playpause">⏯︎︎</string>
+    <string name="seek_backward">↺</string>
+    <string name="seek_forward">↻</string>
 </resources>

@@ -32,6 +32,7 @@ import org.videolan.libvlc.util.VLCVideoLayout
 class PlayerActivity : AppCompatActivity() {
     private val USE_TEXTURE_VIEW: Boolean = true
     private val ENABLE_SUBTITLES: Boolean = true
+    private val SEEK_TIME_MS: Long = 30000L // 30 seconds
 
     private lateinit var playerView: VLCVideoLayout
     private lateinit var playerContainer: FrameLayout
@@ -41,6 +42,8 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var prevButton: Button
     private lateinit var nextButton: Button
     private lateinit var playButton: Button
+    private lateinit var seekBackwardButton: Button
+    private lateinit var seekForwardButton: Button
     private lateinit var customButtonLayout: LinearLayout
     private lateinit var episodeDescription: TextView
 
@@ -71,6 +74,8 @@ class PlayerActivity : AppCompatActivity() {
         prevButton = findViewById(R.id.button_previous_episode)
         nextButton = findViewById(R.id.button_next_episode)
         playButton = findViewById(R.id.button_play_pause)
+        seekBackwardButton = findViewById(R.id.button_seek_backward)
+        seekForwardButton = findViewById(R.id.button_seek_forward)
         customButtonLayout = findViewById(R.id.custom_button_layout)
         episodeDescription = findViewById(R.id.episode_description)
 
@@ -163,18 +168,19 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun setupPlayerControls() {
         buttons.clear()
-        buttons.addAll(listOf(prevButton, playButton, nextButton))
+        buttons.addAll(listOf(prevButton, seekBackwardButton, playButton, seekForwardButton, nextButton))
         
         prevButton.setOnClickListener {
             updatePlayback()
             viewModel.playPreviousEpisode()
             resetAutoHideTimer()
         }
-        nextButton.setOnClickListener {
-            updatePlayback()
-            viewModel.playNextEpisode()
+        
+        seekBackwardButton.setOnClickListener {
+            seekBackward()
             resetAutoHideTimer()
         }
+        
         playButton.setOnClickListener {
             if (mediaPlayer!!.isPlaying) {
                 mediaPlayer?.pause()
@@ -182,6 +188,36 @@ class PlayerActivity : AppCompatActivity() {
                 mediaPlayer?.play()
             }
             resetAutoHideTimer()
+        }
+        
+        seekForwardButton.setOnClickListener {
+            seekForward()
+            resetAutoHideTimer()
+        }
+        
+        nextButton.setOnClickListener {
+            updatePlayback()
+            viewModel.playNextEpisode()
+            resetAutoHideTimer()
+        }
+    }
+
+    private fun seekBackward() {
+        mediaPlayer?.let { player ->
+            val currentTime = player.time
+            val newTime = (currentTime - SEEK_TIME_MS).coerceAtLeast(0L)
+            player.setTime(newTime)
+            Log.d(TAG, "Seeked backward to: ${newTime}ms")
+        }
+    }
+
+    private fun seekForward() {
+        mediaPlayer?.let { player ->
+            val currentTime = player.time
+            val newTime = currentTime + SEEK_TIME_MS
+            // Note: VLC will handle seeking beyond the end of the video
+            player.setTime(newTime)
+            Log.d(TAG, "Seeked forward to: ${newTime}ms")
         }
     }
 
