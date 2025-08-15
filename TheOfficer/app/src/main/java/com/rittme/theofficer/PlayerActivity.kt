@@ -15,6 +15,7 @@ import android.util.Log
 import android.view.KeyEvent
 import android.view.SurfaceView
 import android.view.View
+import android.view.WindowManager
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -78,6 +79,9 @@ class PlayerActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_player)
+
+        // Keep screen on during playback to prevent ambient mode on Android TV
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         playerContainer = findViewById(R.id.player_container)
         playerView = findViewById(R.id.video_layout)
@@ -592,6 +596,8 @@ class PlayerActivity : AppCompatActivity() {
         super.onDestroy()
         releasePlayer()
         mediaSession.release()
+        // Remove the keep screen on flag when activity is destroyed
+        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
 
     private fun releasePlayer() {
