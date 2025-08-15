@@ -1,4 +1,7 @@
 <resources>
-    <string name="app_name">The Officer</string>
+    <string name="app_name">BingeButton</string>
     <string name="start">Start</string>
+    <string name="previous">⏮︎</string>
+    <string name="next">⏭︎</string>
+    <string name="playpause">⏯︎︎</string>
 </resources>

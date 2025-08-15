@@ -12,6 +12,7 @@ import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ProgressBar
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
@@ -41,6 +42,7 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var nextButton: Button
     private lateinit var playButton: Button
     private lateinit var customButtonLayout: LinearLayout
+    private lateinit var episodeDescription: TextView
 
     private val apiService by lazy { ApiService.create() }
     private val viewModel: PlayerViewModel by viewModels {
@@ -70,6 +72,7 @@ class PlayerActivity : AppCompatActivity() {
         nextButton = findViewById(R.id.button_next_episode)
         playButton = findViewById(R.id.button_play_pause)
         customButtonLayout = findViewById(R.id.custom_button_layout)
+        episodeDescription = findViewById(R.id.episode_description)
 
         initializeVLC()
         setupViewModelObservers()
@@ -110,12 +113,30 @@ class PlayerActivity : AppCompatActivity() {
             state.currentEpisode?.let { episode ->
                 Log.d(TAG, "Setting media item: ${episode.videoUrl}, start: ${state.startPositionMs}ms")
                 playMedia(episode.videoUrl, state.startPositionMs)
+                updateEpisodeInfo(episode.id, episode.title)
             } ?: run {
                 if (!state.isLoading && state.allEpisodes.isEmpty()) {
                     Toast.makeText(this, "No episodes available to play.", Toast.LENGTH_LONG).show()
                 }
             }
         }
+    }
+
+    private fun updateEpisodeInfo(episodeId: String, title: String?) {
+        val displayText = if (title != null) {
+            "$episodeId - $title"
+        } else {
+            episodeId
+        }
+        episodeDescription.text = displayText
+        episodeDescription.visibility = View.VISIBLE
+        
+        // Auto-hide episode info after 5 seconds
+        handler.postDelayed({
+            if (isUiVisible) { // Only hide if UI is still visible
+                episodeDescription.visibility = View.GONE
+            }
+        }, 5000)
     }
 
     private fun playMedia(mediaUrl: String, startPosition: Long) {
@@ -213,12 +234,14 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun showUi() {
         customButtonLayout.visibility = View.VISIBLE
+        episodeDescription.visibility = View.VISIBLE
         isUiVisible = true
         resetAutoHideTimer()
     }
 
     private fun hideUi() {
         customButtonLayout.visibility = View.GONE
+        episodeDescription.visibility = View.GONE
         isUiVisible = false
         cancelAutoHideTimer()
     }
