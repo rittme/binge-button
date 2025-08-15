@@ -5,6 +5,8 @@
     <string name="previous">⏮︎</string>
     <string name="next">⏭︎</string>
     <string name="playpause">⏯︎︎</string>
+    <string name="play">▶︎︎︎</string>
+    <string name="pause">⏸︎︎︎︎</string>
     <string name="seek_backward">↺</string>
     <string name="seek_forward">↻</string>
 </resources>
