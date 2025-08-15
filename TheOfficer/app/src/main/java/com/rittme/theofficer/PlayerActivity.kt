@@ -46,6 +46,7 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var seekForwardButton: Button
     private lateinit var customButtonLayout: LinearLayout
     private lateinit var episodeDescription: TextView
+    private lateinit var episodeProgressBar: ProgressBar
 
     private val apiService by lazy { ApiService.create() }
     private val viewModel: PlayerViewModel by viewModels {
@@ -62,6 +63,7 @@ class PlayerActivity : AppCompatActivity() {
     companion object {
         private const val TAG = "PlayerActivity"
         private const val AUTO_HIDE_DELAY_MS = 4000L
+        private const val PROGRESS_UPDATE_INTERVAL_MS = 1000L // Update progress every second
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -78,6 +80,7 @@ class PlayerActivity : AppCompatActivity() {
         seekForwardButton = findViewById(R.id.button_seek_forward)
         customButtonLayout = findViewById(R.id.custom_button_layout)
         episodeDescription = findViewById(R.id.episode_description)
+        episodeProgressBar = findViewById(R.id.episode_progress_bar)
 
         initializeVLC()
         setupViewModelObservers()
@@ -184,8 +187,10 @@ class PlayerActivity : AppCompatActivity() {
         playButton.setOnClickListener {
             if (mediaPlayer!!.isPlaying) {
                 mediaPlayer?.pause()
+                playButton.text = getString(R.string.play);
             } else {
                 mediaPlayer?.play()
+                playButton.text = getString(R.string.pause);
             }
             resetAutoHideTimer()
         }
@@ -207,6 +212,7 @@ class PlayerActivity : AppCompatActivity() {
             val currentTime = player.time
             val newTime = (currentTime - SEEK_TIME_MS).coerceAtLeast(0L)
             player.setTime(newTime)
+            updateProgressBar()
             Log.d(TAG, "Seeked backward to: ${newTime}ms")
         }
     }
@@ -217,7 +223,19 @@ class PlayerActivity : AppCompatActivity() {
             val newTime = currentTime + SEEK_TIME_MS
             // Note: VLC will handle seeking beyond the end of the video
             player.setTime(newTime)
+            updateProgressBar()
             Log.d(TAG, "Seeked forward to: ${newTime}ms")
+        }
+    }
+
+    private fun updateProgressBar() {
+        mediaPlayer?.let { player ->
+            val currentTime = player.time
+            val duration = player.length
+            if (duration > 0) {
+                val progress = ((currentTime.toDouble() / duration.toDouble()) * 100).toInt()
+                episodeProgressBar.progress = progress
+            }
         }
     }
 
@@ -239,24 +257,48 @@ class PlayerActivity : AppCompatActivity() {
                     loadingIndicator.visibility = View.GONE
                     viewModel.startProgressUpdates { mediaPlayer?.time ?: 0L }
                     resetAutoHideTimer()
+                    startProgressUpdates()
                 }
                 MediaPlayer.Event.Paused -> {
                     viewModel.stopProgressUpdates()
                     cancelAutoHideTimer()
+                    stopProgressUpdates()
                 }
                 MediaPlayer.Event.Stopped -> {
                     viewModel.stopProgressUpdates()
                     cancelAutoHideTimer()
+                    stopProgressUpdates()
                 }
                 MediaPlayer.Event.EncounteredError -> {
                     Log.e(TAG, "VLC Player Error")
                     Toast.makeText(this, "Player Error", Toast.LENGTH_LONG).show()
                     cancelAutoHideTimer()
+                    stopProgressUpdates()
                 }
                 else -> {
                     // Handle other events if needed
                 }
             }
+        }
+    }
+
+    private var progressUpdateRunnable: Runnable? = null
+
+    private fun startProgressUpdates() {
+        stopProgressUpdates() // Stop any existing updates
+        progressUpdateRunnable = object : Runnable {
+            override fun run() {
+                updateProgressBar()
+                handler.postDelayed(this, PROGRESS_UPDATE_INTERVAL_MS)
+            }
+        }
+        handler.post(progressUpdateRunnable!!)
+    }
+
+    private fun stopProgressUpdates() {
+        progressUpdateRunnable?.let {
+            handler.removeCallbacks(it)
+            progressUpdateRunnable = null
         }
     }
 
@@ -271,6 +313,7 @@ class PlayerActivity : AppCompatActivity() {
     private fun showUi() {
         customButtonLayout.visibility = View.VISIBLE
         episodeDescription.visibility = View.VISIBLE
+        episodeProgressBar.visibility = View.VISIBLE
         isUiVisible = true
         resetAutoHideTimer()
     }
@@ -278,6 +321,7 @@ class PlayerActivity : AppCompatActivity() {
     private fun hideUi() {
         customButtonLayout.visibility = View.GONE
         episodeDescription.visibility = View.GONE
+        episodeProgressBar.visibility = View.GONE
         isUiVisible = false
         cancelAutoHideTimer()
     }
@@ -417,12 +461,14 @@ class PlayerActivity : AppCompatActivity() {
         mediaPlayer?.play()
         if (mediaPlayer?.isPlaying == true) {
             viewModel.startProgressUpdates { mediaPlayer?.time ?: 0L }
+            startProgressUpdates()
         }
     }
 
     override fun onPause() {
         super.onPause()
         viewModel.stopProgressUpdates()
+        stopProgressUpdates()
         updatePlayback()
         mediaPlayer?.pause()
     }
@@ -433,6 +479,7 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun releasePlayer() {
+        stopProgressUpdates()
         mediaPlayer?.let { player ->
             player.stop()
             player.release()

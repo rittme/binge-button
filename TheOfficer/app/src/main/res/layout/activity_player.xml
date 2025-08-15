@@ -24,12 +24,6 @@
             android:fitsSystemWindows="false" >
 
         </org.videolan.libvlc.util.VLCVideoLayout>
-
-
-        <!--        <SurfaceView-->
-<!--            android:id="@+id/player_view"-->
-<!--            android:layout_width="match_parent"-->
-<!--            android:layout_height="match_parent" />-->
     </FrameLayout>
 
     <LinearLayout
@@ -38,7 +32,6 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:layout_marginBottom="32dp"
-        android:background="#80000000"
         android:padding="8dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -57,11 +50,7 @@
             android:textColor="@color/button_text"
             android:textSize="24sp"
             android:paddingHorizontal="24dp"
-            android:paddingVertical="12dp"
-            android:focusable="true"
-            android:focusableInTouchMode="true"
-            android:nextFocusRight="@id/button_seek_backward"
-            android:nextFocusDown="@id/button_seek_backward" />
+            android:paddingVertical="12dp" />
 
         <Button
             android:id="@+id/button_seek_backward"
@@ -74,13 +63,7 @@
             android:textColor="@color/button_text"
             android:textSize="24sp"
             android:paddingHorizontal="24dp"
-            android:paddingVertical="12dp"
-            android:focusable="true"
-            android:focusableInTouchMode="true"
-            android:nextFocusLeft="@id/button_previous_episode"
-            android:nextFocusRight="@id/button_play_pause"
-            android:nextFocusUp="@id/button_previous_episode"
-            android:nextFocusDown="@id/button_play_pause" />
+            android:paddingVertical="12dp" />
 
         <Button
             android:id="@+id/button_play_pause"
@@ -93,13 +76,7 @@
             android:textColor="@color/button_text"
             android:textSize="24sp"
             android:paddingHorizontal="24dp"
-            android:paddingVertical="12dp"
-            android:focusable="true"
-            android:focusableInTouchMode="true"
-            android:nextFocusLeft="@id/button_seek_backward"
-            android:nextFocusRight="@id/button_seek_forward"
-            android:nextFocusUp="@id/button_seek_backward"
-            android:nextFocusDown="@id/button_seek_forward" />
+            android:paddingVertical="12dp"/>
 
         <Button
             android:id="@+id/button_seek_forward"
@@ -112,13 +89,7 @@
             android:textColor="@color/button_text"
             android:textSize="24sp"
             android:paddingHorizontal="24dp"
-            android:paddingVertical="12dp"
-            android:focusable="true"
-            android:focusableInTouchMode="true"
-            android:nextFocusLeft="@id/button_play_pause"
-            android:nextFocusRight="@id/button_next_episode"
-            android:nextFocusUp="@id/button_play_pause"
-            android:nextFocusDown="@id/button_next_episode" />
+            android:paddingVertical="12dp"/>
 
         <Button
             android:id="@+id/button_next_episode"
@@ -130,11 +101,7 @@
             android:textColor="@color/button_text"
             android:textSize="24sp"
             android:paddingHorizontal="24dp"
-            android:paddingVertical="12dp"
-            android:focusable="true"
-            android:focusableInTouchMode="true"
-            android:nextFocusLeft="@id/button_seek_forward"
-            android:nextFocusUp="@id/button_seek_forward" />
+            android:paddingVertical="12dp"/>
 
     </LinearLayout>
 
@@ -167,5 +134,16 @@
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
+
+    <ProgressBar
+        android:id="@+id/episode_progress_bar"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="0dp"
+        android:layout_height="6dp"
+        android:background="#0C000000"
+        android:progressTint="@color/button_focused"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
