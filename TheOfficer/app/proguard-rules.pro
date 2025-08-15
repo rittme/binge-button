@@ -19,3 +19,33 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Retrofit
+-dontwarn retrofit2.**
+-keep class retrofit2.** { *; }
+-keepattributes Signature
+-keepattributes Exceptions
+
+# Gson
+-keepattributes Signature
+-keepattributes *Annotation*
+-dontwarn sun.misc.**
+-keep class com.google.gson.** { *; }
+-keep class com.rittme.theofficer.data.** { *; }
+
+# VLC
+-keep class org.videolan.libvlc.** { *; }
+-keep class org.videolan.medialibrary.** { *; }
+
+# OkHttp
+-keep class okhttp3.** { *; }
+-keep class okio.** { *; }
+-dontwarn okhttp3.**
+-dontwarn okio.**
+
+# MediaSession
+-keep class android.support.v4.media.** { *; }
+-keep class androidx.media.** { *; }
+
+# ViewModel
+-keep class com.rittme.theofficer.ui.** { *; }

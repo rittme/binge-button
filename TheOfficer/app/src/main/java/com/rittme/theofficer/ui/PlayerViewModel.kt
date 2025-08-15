@@ -40,8 +40,8 @@ class PlayerViewModel(private val apiService: ApiService) : ViewModel() {
 
     fun fetchInitialShowInfo() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value?.copy(isLoading = true, error = null)
             try {
+                _uiState.value = _uiState.value?.copy(isLoading = true, error = null)
                 val response = apiService.getShowInfo()
                 if (response.isSuccessful && response.body() != null) {
                     val showInfo = response.body()!!
@@ -125,10 +125,14 @@ class PlayerViewModel(private val apiService: ApiService) : ViewModel() {
     fun startProgressUpdates(getCurrentPositionMs: () -> Long) {
         progressUpdateJob?.cancel() // Cancel any existing job
         progressUpdateJob = viewModelScope.launch {
-            while (true) {
-                delay(PROGRESS_UPDATE_INTERVAL_MS)
-                val currentPositionMs = getCurrentPositionMs()
-                updatePlaybackState(currentPositionMs / 1000L) // Convert to seconds
+            try {
+                while (true) {
+                    delay(PROGRESS_UPDATE_INTERVAL_MS)
+                    val currentPositionMs = getCurrentPositionMs()
+                    updatePlaybackState(currentPositionMs / 1000L) // Convert to seconds
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error in progress updates", e)
             }
         }
     }

@@ -11,6 +11,7 @@ import retrofit2.http.POST
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import okhttp3.Interceptor
+import java.util.concurrent.TimeUnit
 
 interface ApiService {
     // Adjust base URL to your server's IP and port
@@ -21,7 +22,9 @@ interface ApiService {
         private const val API_KEY = "your-secret-token" // Should match the backend API key
 
         fun create(): ApiService {
-            val logger = HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BODY }
+            val logger = HttpLoggingInterceptor().apply { 
+                level = HttpLoggingInterceptor.Level.BODY 
+            }
             
             // Add API key authentication interceptor
             val authInterceptor = Interceptor { chain ->
@@ -35,6 +38,9 @@ interface ApiService {
             val client = OkHttpClient.Builder()
                 .addInterceptor(logger)
                 .addInterceptor(authInterceptor)
+                .connectTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .writeTimeout(30, TimeUnit.SECONDS)
                 .build()
 
             return Retrofit.Builder()
