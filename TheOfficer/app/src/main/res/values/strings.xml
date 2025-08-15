@@ -9,4 +9,9 @@
     <string name="pause">⏸︎︎︎︎</string>
     <string name="seek_backward">↺</string>
     <string name="seek_forward">↻</string>
+    <string name="error_player_init">Failed to initialize video player</string>
+    <string name="error_network">Network error occurred</string>
+    <string name="error_no_episodes">No episodes available to play</string>
+    <string name="show_finished">You\'ve finished the show!</string>
+    <string name="first_episode">You are at the first episode</string>
 </resources>

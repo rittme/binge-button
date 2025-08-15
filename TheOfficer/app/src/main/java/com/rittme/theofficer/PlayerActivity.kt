@@ -15,7 +15,6 @@ import android.util.Log
 import android.view.KeyEvent
 import android.view.SurfaceView
 import android.view.View
-import android.view.WindowManager
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -80,9 +79,6 @@ class PlayerActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_player)
 
-        // Keep screen on during playback to prevent ambient mode on Android TV
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-
         playerContainer = findViewById(R.id.player_container)
         playerView = findViewById(R.id.video_layout)
         loadingIndicator = findViewById(R.id.loading_indicator)
@@ -104,19 +100,24 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun initializeVLC() {
-        // Initialize LibVLC
-        val options = mutableListOf(
-            "--network-caching=5000",
-            "--aout=opensles",
-            "--audio-time-stretch",
-            "--no-drop-late-frames",
-            "--no-skip-frames",
-            "--rtsp-tcp",
-            "--freetype-font=/system/fonts/Roboto.ttf"
-        )
-        libVLC = LibVLC(this, options)
-        mediaPlayer = MediaPlayer(libVLC)
-        mediaPlayer?.attachViews(playerView, null, ENABLE_SUBTITLES, USE_TEXTURE_VIEW)
+        try {
+            // Initialize LibVLC
+            val options = mutableListOf(
+                "--network-caching=5000",
+                "--aout=opensles",
+                "--audio-time-stretch",
+                "--no-drop-late-frames",
+                "--no-skip-frames",
+                "--rtsp-tcp",
+                "--freetype-font=/system/fonts/Roboto.ttf"
+            )
+            libVLC = LibVLC(this, options)
+            mediaPlayer = MediaPlayer(libVLC)
+            mediaPlayer?.attachViews(playerView, null, ENABLE_SUBTITLES, USE_TEXTURE_VIEW)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to initialize VLC", e)
+            Toast.makeText(this, getString(R.string.error_player_init), Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun initializeMediaSession() {
@@ -216,7 +217,7 @@ class PlayerActivity : AppCompatActivity() {
                 updateEpisodeInfo(episode.id, episode.title)
             } ?: run {
                 if (!state.isLoading && state.allEpisodes.isEmpty()) {
-                    Toast.makeText(this, "No episodes available to play.", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this, getString(R.string.error_no_episodes), Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -244,26 +245,31 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun playMedia(mediaUrl: String, startPosition: Long) {
-        mediaPlayer?.stop()
+        try {
+            mediaPlayer?.stop()
 
-        val media = Media(libVLC, Uri.parse(mediaUrl))
-        mediaPlayer?.media = media
+            val media = Media(libVLC, Uri.parse(mediaUrl))
+            mediaPlayer?.media = media
 
-        // Add subtitle track if available
-        val currentEpisode = viewModel.uiState.value?.currentEpisode
-        currentEpisode?.subtitleUrl?.let { subtitleUrl ->
-            Log.d(TAG, "Adding subtitle track: $subtitleUrl")
-            mediaPlayer?.addSlave(Slave.Type.Subtitle, subtitleUrl.toUri(), true)
-            Log.d(TAG, mediaPlayer?.spuTracks.toString())
+            // Add subtitle track if available
+            val currentEpisode = viewModel.uiState.value?.currentEpisode
+            currentEpisode?.subtitleUrl?.let { subtitleUrl ->
+                Log.d(TAG, "Adding subtitle track: $subtitleUrl")
+                mediaPlayer?.addSlave(Slave.Type.Subtitle, subtitleUrl.toUri(), true)
+                Log.d(TAG, mediaPlayer?.spuTracks.toString())
+            }
+
+            media.release()
+
+            Log.d(TAG, "Start Position: $startPosition")
+
+            mediaPlayer?.play()
+            mediaPlayer?.setTime(startPosition)
+            updatePlaybackState()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error playing media: $mediaUrl", e)
+            Toast.makeText(this, "Failed to play media: ${e.message}", Toast.LENGTH_LONG).show()
         }
-
-        media.release()
-
-        Log.d(TAG, "Start Position: $startPosition")
-
-        mediaPlayer?.play()
-        mediaPlayer?.setTime(startPosition)
-        updatePlaybackState()
     }
 
     private fun setupPlayerControls() {
@@ -283,12 +289,14 @@ class PlayerActivity : AppCompatActivity() {
         }
         
         playButton.setOnClickListener {
-            if (mediaPlayer!!.isPlaying) {
-                mediaPlayer?.pause()
-                playButton.text = getString(R.string.play);
-            } else {
-                mediaPlayer?.play()
-                playButton.text = getString(R.string.pause);
+            mediaPlayer?.let { player ->
+                if (player.isPlaying) {
+                    player.pause()
+                    playButton.text = getString(R.string.play)
+                } else {
+                    player.play()
+                    playButton.text = getString(R.string.pause)
+                }
             }
             resetAutoHideTimer()
             updatePlaybackState()
@@ -399,14 +407,14 @@ class PlayerActivity : AppCompatActivity() {
                 handler.postDelayed(this, PROGRESS_UPDATE_INTERVAL_MS)
             }
         }
-        handler.post(progressUpdateRunnable!!)
+        progressUpdateRunnable?.let { handler.post(it) }
     }
 
     private fun stopProgressUpdates() {
         progressUpdateRunnable?.let {
             handler.removeCallbacks(it)
-            progressUpdateRunnable = null
         }
+        progressUpdateRunnable = null
     }
 
     private fun toggleUiVisibility() {
@@ -441,15 +449,15 @@ class PlayerActivity : AppCompatActivity() {
             hideRunnable = Runnable {
                 hideUi()
             }
-            handler.postDelayed(hideRunnable!!, AUTO_HIDE_DELAY_MS)
+            hideRunnable?.let { handler.postDelayed(it, AUTO_HIDE_DELAY_MS) }
         }
     }
 
     private fun cancelAutoHideTimer() {
         hideRunnable?.let {
             handler.removeCallbacks(it)
-            hideRunnable = null
         }
+        hideRunnable = null
     }
 
     private fun hideSystemUi() {
@@ -596,17 +604,28 @@ class PlayerActivity : AppCompatActivity() {
         super.onDestroy()
         releasePlayer()
         mediaSession.release()
-        // Remove the keep screen on flag when activity is destroyed
-        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        // Clean up any remaining handlers
+        handler.removeCallbacksAndMessages(null)
     }
 
     private fun releasePlayer() {
         stopProgressUpdates()
+        cancelAutoHideTimer()
         mediaPlayer?.let { player ->
-            player.stop()
-            player.release()
+            try {
+                player.stop()
+                player.release()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error releasing player", e)
+            }
         }
-        libVLC?.release()
+        libVLC?.let {
+            try {
+                it.release()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error releasing libVLC", e)
+            }
+        }
         libVLC = null
         mediaPlayer = null
     }
