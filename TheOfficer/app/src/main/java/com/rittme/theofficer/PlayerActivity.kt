@@ -1,9 +1,16 @@
 package com.rittme.theofficer
 
+import android.content.ComponentName
+import android.content.Context
+import android.media.AudioManager
+import android.media.MediaMetadata
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.support.v4.media.MediaMetadataCompat
+import android.support.v4.media.session.MediaSessionCompat
+import android.support.v4.media.session.PlaybackStateCompat
 import android.util.Log
 import android.view.KeyEvent
 import android.view.SurfaceView
@@ -47,6 +54,8 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var customButtonLayout: LinearLayout
     private lateinit var episodeDescription: TextView
     private lateinit var episodeProgressBar: ProgressBar
+    private lateinit var mediaSession: MediaSessionCompat
+    private lateinit var audioManager: AudioManager
 
     private val apiService by lazy { ApiService.create() }
     private val viewModel: PlayerViewModel by viewModels {
@@ -81,8 +90,10 @@ class PlayerActivity : AppCompatActivity() {
         customButtonLayout = findViewById(R.id.custom_button_layout)
         episodeDescription = findViewById(R.id.episode_description)
         episodeProgressBar = findViewById(R.id.episode_progress_bar)
+        audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
         initializeVLC()
+        initializeMediaSession()
         setupViewModelObservers()
         setupPlayerControls()
         setupAutoHideControls()
@@ -102,6 +113,83 @@ class PlayerActivity : AppCompatActivity() {
         libVLC = LibVLC(this, options)
         mediaPlayer = MediaPlayer(libVLC)
         mediaPlayer?.attachViews(playerView, null, ENABLE_SUBTITLES, USE_TEXTURE_VIEW)
+    }
+
+    private fun initializeMediaSession() {
+        mediaSession = MediaSessionCompat(this, "PlayerActivity")
+        mediaSession.setCallback(mediaSessionCallback)
+        mediaSession.setFlags(MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS or
+                MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS)
+        
+        // Set initial playback state
+        val stateBuilder = PlaybackStateCompat.Builder()
+            .setActions(PlaybackStateCompat.ACTION_PLAY or
+                    PlaybackStateCompat.ACTION_PAUSE or
+                    PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
+                    PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or
+                    PlaybackStateCompat.ACTION_SEEK_TO)
+        mediaSession.setPlaybackState(stateBuilder.build())
+        
+        mediaSession.isActive = true
+    }
+
+    private val mediaSessionCallback = object : MediaSessionCompat.Callback() {
+        override fun onPlay() {
+            mediaPlayer?.play()
+            updatePlaybackState()
+        }
+
+        override fun onPause() {
+            mediaPlayer?.pause()
+            updatePlaybackState()
+        }
+
+        override fun onSkipToNext() {
+            updatePlayback()
+            viewModel.playNextEpisode()
+        }
+
+        override fun onSkipToPrevious() {
+            updatePlayback()
+            viewModel.playPreviousEpisode()
+        }
+
+        override fun onSeekTo(pos: Long) {
+            mediaPlayer?.setTime(pos)
+            updateProgressBar()
+            updatePlaybackState()
+        }
+    }
+
+    private fun updatePlaybackState() {
+        val state = if (mediaPlayer?.isPlaying == true) {
+            PlaybackStateCompat.STATE_PLAYING
+        } else {
+            PlaybackStateCompat.STATE_PAUSED
+        }
+
+        val position = mediaPlayer?.time ?: 0L
+
+        val stateBuilder = PlaybackStateCompat.Builder()
+            .setState(state, position, 1.0f)
+            .setActions(PlaybackStateCompat.ACTION_PLAY or
+                    PlaybackStateCompat.ACTION_PAUSE or
+                    PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
+                    PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or
+                    PlaybackStateCompat.ACTION_SEEK_TO)
+            .setBufferedPosition(0)
+
+        mediaSession.setPlaybackState(stateBuilder.build())
+    }
+
+    private fun updateMediaMetadata(episodeId: String, title: String?, duration: Long) {
+        val metadataBuilder = MediaMetadataCompat.Builder()
+            .putString(MediaMetadataCompat.METADATA_KEY_TITLE, title ?: episodeId)
+            .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_TITLE, title ?: episodeId)
+            .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE, episodeId)
+            .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, duration)
+
+        mediaSession.setMetadata(metadataBuilder.build())
     }
 
     private fun updatePlayback() {
@@ -139,6 +227,10 @@ class PlayerActivity : AppCompatActivity() {
         episodeDescription.text = displayText
         episodeDescription.visibility = View.VISIBLE
         
+        // Update media metadata
+        val duration = mediaPlayer?.length ?: 0L
+        updateMediaMetadata(episodeId, title, duration)
+        
         // Auto-hide episode info after 5 seconds
         handler.postDelayed({
             if (isUiVisible) { // Only hide if UI is still visible
@@ -167,6 +259,7 @@ class PlayerActivity : AppCompatActivity() {
 
         mediaPlayer?.play()
         mediaPlayer?.setTime(startPosition)
+        updatePlaybackState()
     }
 
     private fun setupPlayerControls() {
@@ -177,6 +270,7 @@ class PlayerActivity : AppCompatActivity() {
             updatePlayback()
             viewModel.playPreviousEpisode()
             resetAutoHideTimer()
+            updatePlaybackState()
         }
         
         seekBackwardButton.setOnClickListener {
@@ -193,6 +287,7 @@ class PlayerActivity : AppCompatActivity() {
                 playButton.text = getString(R.string.pause);
             }
             resetAutoHideTimer()
+            updatePlaybackState()
         }
         
         seekForwardButton.setOnClickListener {
@@ -204,6 +299,7 @@ class PlayerActivity : AppCompatActivity() {
             updatePlayback()
             viewModel.playNextEpisode()
             resetAutoHideTimer()
+            updatePlaybackState()
         }
     }
 
@@ -213,6 +309,7 @@ class PlayerActivity : AppCompatActivity() {
             val newTime = (currentTime - SEEK_TIME_MS).coerceAtLeast(0L)
             player.setTime(newTime)
             updateProgressBar()
+            updatePlaybackState()
             Log.d(TAG, "Seeked backward to: ${newTime}ms")
         }
     }
@@ -224,6 +321,7 @@ class PlayerActivity : AppCompatActivity() {
             // Note: VLC will handle seeking beyond the end of the video
             player.setTime(newTime)
             updateProgressBar()
+            updatePlaybackState()
             Log.d(TAG, "Seeked forward to: ${newTime}ms")
         }
     }
@@ -258,22 +356,26 @@ class PlayerActivity : AppCompatActivity() {
                     viewModel.startProgressUpdates { mediaPlayer?.time ?: 0L }
                     resetAutoHideTimer()
                     startProgressUpdates()
+                    updatePlaybackState()
                 }
                 MediaPlayer.Event.Paused -> {
                     viewModel.stopProgressUpdates()
                     cancelAutoHideTimer()
                     stopProgressUpdates()
+                    updatePlaybackState()
                 }
                 MediaPlayer.Event.Stopped -> {
                     viewModel.stopProgressUpdates()
                     cancelAutoHideTimer()
                     stopProgressUpdates()
+                    updatePlaybackState()
                 }
                 MediaPlayer.Event.EncounteredError -> {
                     Log.e(TAG, "VLC Player Error")
                     Toast.makeText(this, "Player Error", Toast.LENGTH_LONG).show()
                     cancelAutoHideTimer()
                     stopProgressUpdates()
+                    updatePlaybackState()
                 }
                 else -> {
                     // Handle other events if needed
@@ -289,6 +391,7 @@ class PlayerActivity : AppCompatActivity() {
         progressUpdateRunnable = object : Runnable {
             override fun run() {
                 updateProgressBar()
+                updatePlaybackState()
                 handler.postDelayed(this, PROGRESS_UPDATE_INTERVAL_MS)
             }
         }
@@ -411,6 +514,12 @@ class PlayerActivity : AppCompatActivity() {
                     return true
                 }
             }
+            else -> {
+                // Let MediaSession handle media buttons
+                if (mediaSession.controller.dispatchMediaButtonEvent(event)) {
+                    return true
+                }
+            }
         }
         return super.onKeyDown(keyCode, event)
     }
@@ -453,6 +562,7 @@ class PlayerActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
+        mediaSession.isActive = true
     }
 
     override fun onResume() {
@@ -475,7 +585,13 @@ class PlayerActivity : AppCompatActivity() {
 
     override fun onStop() {
         super.onStop()
+        mediaSession.isActive = false
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
         releasePlayer()
+        mediaSession.release()
     }
 
     private fun releasePlayer() {
