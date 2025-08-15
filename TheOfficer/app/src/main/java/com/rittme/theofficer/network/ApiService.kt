@@ -14,10 +14,10 @@ import okhttp3.Interceptor
 
 interface ApiService {
     // Adjust base URL to your server's IP and port
-    // For emulator, if server is on host machine: "http://10.0.2.2:8080/"
+    // For emulator, if server is on host machine: "http://192.168.1.42:4242/"
     // For physical device on same network: "http://YOUR_SERVER_IP:8080/"
     companion object {
-        private const val BASE_URL = "http://10.0.2.2:8080/" // Backend server running on port 8080
+        private const val BASE_URL = "https://bb.13b.xyz/"
         private const val API_KEY = "your-secret-token" // Should match the backend API key
 
         fun create(): ApiService {
