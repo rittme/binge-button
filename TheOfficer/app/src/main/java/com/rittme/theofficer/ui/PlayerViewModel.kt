@@ -42,9 +42,11 @@ class PlayerViewModel(private val apiService: ApiService) : ViewModel() {
         viewModelScope.launch {
             try {
                 _uiState.value = _uiState.value?.copy(isLoading = true, error = null)
+                Log.d(TAG, "Fetching show info from server...")
                 val response = apiService.getShowInfo()
                 if (response.isSuccessful && response.body() != null) {
                     val showInfo = response.body()!!
+                    Log.d(TAG, "Successfully fetched show info with ${showInfo.episodes.size} episodes")
                     allEpisodes = showInfo.episodes
                     currentEpisodeId = showInfo.currentEpisodeId
 
@@ -67,12 +69,15 @@ class PlayerViewModel(private val apiService: ApiService) : ViewModel() {
                         isLoading = false,
                         allEpisodes = allEpisodes
                     )
+                    Log.d(TAG, "Successfully loaded episode: ${episodeToPlay.id}")
                 } else {
-                    _uiState.value = _uiState.value?.copy(isLoading = false, error = "Failed to load show info: ${response.message()}")
-                    Log.e(TAG, "Error fetching show info: ${response.code()} - ${response.message()}")
+                    val errorMessage = "Failed to load show info: ${response.code()} - ${response.message()}"
+                    _uiState.value = _uiState.value?.copy(isLoading = false, error = errorMessage)
+                    Log.e(TAG, errorMessage)
                 }
             } catch (e: Exception) {
-                _uiState.value = _uiState.value?.copy(isLoading = false, error = "Network error: ${e.message}")
+                val errorMessage = "Network error: ${e.message}"
+                _uiState.value = _uiState.value?.copy(isLoading = false, error = errorMessage)
                 Log.e(TAG, "Network error: ", e)
             }
         }
