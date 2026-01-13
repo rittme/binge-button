@@ -580,6 +580,15 @@ class PlayerActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         hideSystemUi()
+
+        // If we have an error and no episodes loaded, retry fetching
+        viewModel.uiState.value?.let { state ->
+            if (state.error != null && state.allEpisodes.isEmpty() && !state.isLoading) {
+                Log.d(TAG, "Retrying episode fetch on resume due to error state")
+                viewModel.fetchInitialShowInfo()
+            }
+        }
+
         mediaPlayer?.play()
         if (mediaPlayer?.isPlaying == true) {
             viewModel.startProgressUpdates { mediaPlayer?.time ?: 0L }
