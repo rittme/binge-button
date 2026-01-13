@@ -28,10 +28,14 @@ class PlayerViewModel(private val apiService: ApiService) : ViewModel() {
     private var currentEpisodeId: String? = null
 
     private var progressUpdateJob: Job? = null
+    private var fetchJob: Job? = null
+    private var retryCount = 0
 
     companion object {
         private const val TAG = "PlayerViewModel"
         private const val PROGRESS_UPDATE_INTERVAL_MS = 15_000L // 15 seconds
+        private const val MAX_RETRY_ATTEMPTS = 5
+        private const val INITIAL_RETRY_DELAY_MS = 2000L // 2 seconds
     }
 
     init {
@@ -39,41 +43,104 @@ class PlayerViewModel(private val apiService: ApiService) : ViewModel() {
     }
 
     fun fetchInitialShowInfo() {
-        viewModelScope.launch {
+        // Cancel any existing fetch job to prevent duplicate fetches
+        fetchJob?.cancel()
+
+        fetchJob = viewModelScope.launch {
+            retryCount = 0
+            fetchWithRetry()
+        }
+    }
+
+    private suspend fun fetchWithRetry() {
+        var currentDelay = INITIAL_RETRY_DELAY_MS
+
+        while (retryCount < MAX_RETRY_ATTEMPTS) {
             try {
-                _uiState.value = _uiState.value?.copy(isLoading = true, error = null)
+                _uiState.value = _uiState.value?.copy(
+                    isLoading = true,
+                    error = if (retryCount > 0) "Retrying... (${retryCount}/$MAX_RETRY_ATTEMPTS)" else null
+                )
+
                 val response = apiService.getShowInfo()
+
                 if (response.isSuccessful && response.body() != null) {
                     val showInfo = response.body()!!
                     allEpisodes = showInfo.episodes
                     currentEpisodeId = showInfo.currentEpisodeId
 
                     if (allEpisodes.isEmpty()) {
-                        _uiState.value = _uiState.value?.copy(isLoading = false, error = "No episodes found.")
-                        return@launch
+                        // Empty episodes could be temporary - retry
+                        Log.w(TAG, "Received empty episodes list, attempt ${retryCount + 1}/$MAX_RETRY_ATTEMPTS")
+                        retryCount++
+
+                        if (retryCount >= MAX_RETRY_ATTEMPTS) {
+                            _uiState.value = _uiState.value?.copy(
+                                isLoading = false,
+                                error = "No episodes found after $MAX_RETRY_ATTEMPTS attempts."
+                            )
+                            return
+                        }
+
+                        // Wait before retry with exponential backoff
+                        delay(currentDelay)
+                        currentDelay *= 2 // Double delay for next retry
+                        continue
                     }
 
+                    // Success! Reset retry count and update UI
+                    retryCount = 0
                     currentEpisodeIndex = allEpisodes.indexOfFirst { it.id == currentEpisodeId }
-                    if (currentEpisodeIndex == -1) { // Default to first episode if not found or null
+                    if (currentEpisodeIndex == -1) {
                         currentEpisodeIndex = 0
                     }
 
                     val episodeToPlay = allEpisodes[currentEpisodeIndex]
-                    currentEpisodeId = episodeToPlay.id // Update currentEpisodeId
+                    currentEpisodeId = episodeToPlay.id
 
                     _uiState.value = _uiState.value?.copy(
                         currentEpisode = episodeToPlay,
                         startPositionMs = showInfo.playbackTimeSeconds * 1000L,
                         isLoading = false,
+                        error = null,
                         allEpisodes = allEpisodes
                     )
+
+                    Log.d(TAG, "Successfully loaded ${allEpisodes.size} episodes")
+                    return // Success - exit retry loop
+
                 } else {
-                    _uiState.value = _uiState.value?.copy(isLoading = false, error = "Failed to load show info: ${response.message()}")
-                    Log.e(TAG, "Error fetching show info: ${response.code()} - ${response.message()}")
+                    // API returned error - retry
+                    Log.e(TAG, "API error: ${response.code()} - ${response.message()}, attempt ${retryCount + 1}/$MAX_RETRY_ATTEMPTS")
+                    retryCount++
+
+                    if (retryCount >= MAX_RETRY_ATTEMPTS) {
+                        _uiState.value = _uiState.value?.copy(
+                            isLoading = false,
+                            error = "Failed to load episodes: ${response.message()}"
+                        )
+                        return
+                    }
+
+                    delay(currentDelay)
+                    currentDelay *= 2
                 }
+
             } catch (e: Exception) {
-                _uiState.value = _uiState.value?.copy(isLoading = false, error = "Network error: ${e.message}")
-                Log.e(TAG, "Network error: ", e)
+                // Network error - retry
+                Log.e(TAG, "Network error, attempt ${retryCount + 1}/$MAX_RETRY_ATTEMPTS: ", e)
+                retryCount++
+
+                if (retryCount >= MAX_RETRY_ATTEMPTS) {
+                    _uiState.value = _uiState.value?.copy(
+                        isLoading = false,
+                        error = "Network error after $MAX_RETRY_ATTEMPTS attempts: ${e.message}"
+                    )
+                    return
+                }
+
+                delay(currentDelay)
+                currentDelay *= 2
             }
         }
     }
