@@ -6,7 +6,7 @@
     <string name="next">⏭︎</string>
     <string name="playpause">⏯︎︎</string>
     <string name="play">▶︎︎︎</string>
-    <string name="pause">⏸︎︎︎︎</string>
+    <string name="pause">CU</string>
     <string name="seek_backward">↺</string>
     <string name="seek_forward">↻</string>
     <string name="error_player_init">Failed to initialize video player</string>

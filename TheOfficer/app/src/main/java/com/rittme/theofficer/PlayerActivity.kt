@@ -208,6 +208,7 @@ class PlayerActivity : AppCompatActivity() {
             loadingIndicator.visibility = if (state.isLoading) View.VISIBLE else View.GONE
 
             state.error?.let {
+                Log.e(TAG, "UI State Error: $it")
                 Toast.makeText(this, it, Toast.LENGTH_LONG).show()
             }
 
