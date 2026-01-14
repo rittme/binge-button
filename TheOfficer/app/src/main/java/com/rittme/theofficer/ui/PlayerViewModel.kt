@@ -62,10 +62,13 @@ class PlayerViewModel(private val apiService: ApiService) : ViewModel() {
                     error = if (retryCount > 0) "Retrying... (${retryCount}/$MAX_RETRY_ATTEMPTS)" else null
                 )
 
+                Log.d(TAG, "Fetching show info from server...")
+
                 val response = apiService.getShowInfo()
 
                 if (response.isSuccessful && response.body() != null) {
                     val showInfo = response.body()!!
+                    Log.d(TAG, "Successfully fetched show info with ${showInfo.episodes.size} episodes")
                     allEpisodes = showInfo.episodes
                     currentEpisodeId = showInfo.currentEpisodeId
 
@@ -125,6 +128,7 @@ class PlayerViewModel(private val apiService: ApiService) : ViewModel() {
                     delay(currentDelay)
                     currentDelay *= 2
                 }
+                
 
             } catch (e: Exception) {
                 // Network error - retry
