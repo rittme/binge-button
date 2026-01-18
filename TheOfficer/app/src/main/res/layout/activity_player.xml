@@ -146,4 +146,31 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
 
+    <!-- Network Debug Panel -->
+    <ScrollView
+        android:id="@+id/debug_panel"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp"
+        android:background="#DD000000"
+        android:padding="16dp"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintWidth_max="800dp"
+        tools:visibility="visible">
+
+        <TextView
+            android:id="@+id/debug_info"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#FFFF00"
+            android:textSize="18sp"
+            android:fontFamily="monospace"
+            android:text="Network Debug Information"
+            android:lineSpacingMultiplier="1.2" />
+    </ScrollView>
+
 </androidx.constraintlayout.widget.ConstraintLayout>

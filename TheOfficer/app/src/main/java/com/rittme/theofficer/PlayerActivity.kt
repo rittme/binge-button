@@ -54,6 +54,8 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var customButtonLayout: LinearLayout
     private lateinit var episodeDescription: TextView
     private lateinit var episodeProgressBar: ProgressBar
+    private lateinit var debugPanel: View
+    private lateinit var debugInfo: TextView
     private lateinit var mediaSession: MediaSessionCompat
     private lateinit var audioManager: AudioManager
 
@@ -90,6 +92,8 @@ class PlayerActivity : AppCompatActivity() {
         customButtonLayout = findViewById(R.id.custom_button_layout)
         episodeDescription = findViewById(R.id.episode_description)
         episodeProgressBar = findViewById(R.id.episode_progress_bar)
+        debugPanel = findViewById(R.id.debug_panel)
+        debugInfo = findViewById(R.id.debug_info)
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
         initializeVLC()
@@ -207,6 +211,15 @@ class PlayerActivity : AppCompatActivity() {
         viewModel.uiState.observe(this) { state ->
             loadingIndicator.visibility = if (state.isLoading) View.VISIBLE else View.GONE
 
+            // Show or hide debug panel based on debug info availability
+            state.debugInfo?.let { info ->
+                debugInfo.text = info
+                debugPanel.visibility = View.VISIBLE
+                Log.d(TAG, "Debug Info:\n$info")
+            } ?: run {
+                debugPanel.visibility = View.GONE
+            }
+
             state.error?.let {
                 Toast.makeText(this, it, Toast.LENGTH_LONG).show()
             }
@@ -215,6 +228,8 @@ class PlayerActivity : AppCompatActivity() {
                 Log.d(TAG, "Setting media item: ${episode.videoUrl}, start: ${state.startPositionMs}ms")
                 playMedia(episode.videoUrl, state.startPositionMs)
                 updateEpisodeInfo(episode.id, episode.title)
+                // Hide debug panel on successful playback
+                debugPanel.visibility = View.GONE
             } ?: run {
                 if (!state.isLoading && state.allEpisodes.isEmpty()) {
                     Toast.makeText(this, getString(R.string.error_no_episodes), Toast.LENGTH_LONG).show()
@@ -525,6 +540,17 @@ class PlayerActivity : AppCompatActivity() {
                     hideUi()
                     return true
                 }
+            }
+            KeyEvent.KEYCODE_MENU,
+            KeyEvent.KEYCODE_INFO -> {
+                // Toggle debug panel with MENU or INFO button
+                debugPanel.visibility = if (debugPanel.visibility == View.VISIBLE) {
+                    View.GONE
+                } else {
+                    View.VISIBLE
+                }
+                Toast.makeText(this, "Debug panel ${if (debugPanel.visibility == View.VISIBLE) "shown" else "hidden"}", Toast.LENGTH_SHORT).show()
+                return true
             }
             else -> {
                 // Let MediaSession handle media buttons
