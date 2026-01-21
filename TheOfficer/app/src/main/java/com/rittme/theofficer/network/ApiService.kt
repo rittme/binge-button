@@ -18,7 +18,7 @@ interface ApiService {
     // For emulator, if server is on host machine: "http://192.168.1.42:4242/"
     // For physical device on same network: "http://YOUR_SERVER_IP:8080/"
     companion object {
-        private const val BASE_URL = "https://bb.13b.xyz/"
+        private const val BASE_URL = "http://bb.13b.xyz/"
         private const val API_KEY = "your-secret-token" // Should match the backend API key
 
         fun create(): ApiService {
