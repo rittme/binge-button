@@ -75,8 +75,10 @@ dependencies {
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
 
-    // VLC Android dependencies
-    implementation("org.videolan.android:libvlc-all:3.6.0")
+    // ExoPlayer (Media3) dependencies
+    implementation("androidx.media3:media3-exoplayer:1.5.0")
+    implementation("androidx.media3:media3-ui:1.5.0")
+    implementation("androidx.media3:media3-session:1.5.0")
     
     // If using Jellyfin API or custom API with Retrofit
     implementation(libs.retrofit)

@@ -29,11 +29,14 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.rittme.theofficer.network.ApiService
 import com.rittme.theofficer.ui.PlayerViewModel
-import org.videolan.libvlc.LibVLC
-import org.videolan.libvlc.Media
-import org.videolan.libvlc.MediaPlayer
-import org.videolan.libvlc.interfaces.IMedia.Slave
-import org.videolan.libvlc.util.VLCVideoLayout
+import androidx.media3.common.C
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.PlayerView
 
 
 class PlayerActivity : AppCompatActivity() {
@@ -41,10 +44,9 @@ class PlayerActivity : AppCompatActivity() {
     private val ENABLE_SUBTITLES: Boolean = true
     private val SEEK_TIME_MS: Long = 30000L // 30 seconds
 
-    private lateinit var playerView: VLCVideoLayout
+    private lateinit var playerView: PlayerView
     private lateinit var playerContainer: FrameLayout
-    private var libVLC: LibVLC? = null
-    private var mediaPlayer: MediaPlayer? = null
+    private var exoPlayer: ExoPlayer? = null
     private lateinit var loadingIndicator: ProgressBar
     private lateinit var prevButton: Button
     private lateinit var nextButton: Button
@@ -80,7 +82,7 @@ class PlayerActivity : AppCompatActivity() {
         setContentView(R.layout.activity_player)
 
         playerContainer = findViewById(R.id.player_container)
-        playerView = findViewById(R.id.video_layout)
+        playerView = findViewById(R.id.player_view)
         loadingIndicator = findViewById(R.id.loading_indicator)
         prevButton = findViewById(R.id.button_previous_episode)
         nextButton = findViewById(R.id.button_next_episode)
@@ -92,31 +94,81 @@ class PlayerActivity : AppCompatActivity() {
         episodeProgressBar = findViewById(R.id.episode_progress_bar)
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
-        initializeVLC()
+        initializePlayer()
         initializeMediaSession()
         setupViewModelObservers()
         setupPlayerControls()
         setupAutoHideControls()
     }
 
-    private fun initializeVLC() {
+    @androidx.annotation.OptIn(UnstableApi::class)
+    private fun initializePlayer() {
         try {
-            // Initialize LibVLC
-            val options = mutableListOf(
-                "--network-caching=5000",
-                "--aout=opensles",
-                "--audio-time-stretch",
-                "--no-drop-late-frames",
-                "--no-skip-frames",
-                "--rtsp-tcp",
-                "--freetype-font=/system/fonts/Roboto.ttf"
-            )
-            libVLC = LibVLC(this, options)
-            mediaPlayer = MediaPlayer(libVLC)
-            mediaPlayer?.attachViews(playerView, null, ENABLE_SUBTITLES, USE_TEXTURE_VIEW)
+            // Initialize ExoPlayer
+            exoPlayer = ExoPlayer.Builder(this)
+                .setSeekBackIncrementMs(SEEK_TIME_MS)
+                .setSeekForwardIncrementMs(SEEK_TIME_MS)
+                .build()
+                .also { player ->
+                    playerView.player = player
+                    playerView.useController = false
+
+                    // Add player event listener
+                    player.addListener(playerListener)
+                }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to initialize VLC", e)
+            Log.e(TAG, "Failed to initialize ExoPlayer", e)
             Toast.makeText(this, getString(R.string.error_player_init), Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private val playerListener = object : Player.Listener {
+        override fun onPlaybackStateChanged(playbackState: Int) {
+            when (playbackState) {
+                Player.STATE_ENDED -> {
+                    Log.d(TAG, "Episode ended, trying to play next.")
+                    viewModel.playNextEpisode()
+                    hideUi()
+                }
+                Player.STATE_READY -> {
+                    loadingIndicator.visibility = View.GONE
+                    if (exoPlayer?.isPlaying == true) {
+                        viewModel.startProgressUpdates { exoPlayer?.currentPosition ?: 0L }
+                        resetAutoHideTimer()
+                        startProgressUpdates()
+                    }
+                    updatePlaybackState()
+                }
+                Player.STATE_BUFFERING -> {
+                    loadingIndicator.visibility = View.VISIBLE
+                }
+                else -> {
+                    updatePlaybackState()
+                }
+            }
+        }
+
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            if (isPlaying) {
+                viewModel.startProgressUpdates { exoPlayer?.currentPosition ?: 0L }
+                resetAutoHideTimer()
+                startProgressUpdates()
+                playButton.text = getString(R.string.pause)
+            } else {
+                viewModel.stopProgressUpdates()
+                cancelAutoHideTimer()
+                stopProgressUpdates()
+                playButton.text = getString(R.string.play)
+            }
+            updatePlaybackState()
+        }
+
+        override fun onPlayerError(error: PlaybackException) {
+            Log.e(TAG, "ExoPlayer Error: ${error.message}", error)
+            Toast.makeText(this@PlayerActivity, "Player Error: ${error.message}", Toast.LENGTH_LONG).show()
+            cancelAutoHideTimer()
+            stopProgressUpdates()
+            updatePlaybackState()
         }
     }
 
@@ -140,12 +192,12 @@ class PlayerActivity : AppCompatActivity() {
 
     private val mediaSessionCallback = object : MediaSessionCompat.Callback() {
         override fun onPlay() {
-            mediaPlayer?.play()
+            exoPlayer?.play()
             updatePlaybackState()
         }
 
         override fun onPause() {
-            mediaPlayer?.pause()
+            exoPlayer?.pause()
             updatePlaybackState()
         }
 
@@ -160,20 +212,20 @@ class PlayerActivity : AppCompatActivity() {
         }
 
         override fun onSeekTo(pos: Long) {
-            mediaPlayer?.setTime(pos)
+            exoPlayer?.seekTo(pos)
             updateProgressBar()
             updatePlaybackState()
         }
     }
 
     private fun updatePlaybackState() {
-        val state = if (mediaPlayer?.isPlaying == true) {
+        val state = if (exoPlayer?.isPlaying == true) {
             PlaybackStateCompat.STATE_PLAYING
         } else {
             PlaybackStateCompat.STATE_PAUSED
         }
 
-        val position = mediaPlayer?.time ?: 0L
+        val position = exoPlayer?.currentPosition ?: 0L
 
         val stateBuilder = PlaybackStateCompat.Builder()
             .setState(state, position, 1.0f)
@@ -182,7 +234,7 @@ class PlayerActivity : AppCompatActivity() {
                     PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
                     PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or
                     PlaybackStateCompat.ACTION_SEEK_TO)
-            .setBufferedPosition(0)
+            .setBufferedPosition(exoPlayer?.bufferedPosition ?: 0L)
 
         mediaSession.setPlaybackState(stateBuilder.build())
     }
@@ -198,7 +250,7 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun updatePlayback() {
-        mediaPlayer?.time?.let { currentTime ->
+        exoPlayer?.currentPosition?.let { currentTime ->
             viewModel.updatePlaybackState(currentTime / 1000L)
         }
     }
@@ -232,9 +284,9 @@ class PlayerActivity : AppCompatActivity() {
         }
         episodeDescription.text = displayText
         episodeDescription.visibility = View.VISIBLE
-        
+
         // Update media metadata
-        val duration = mediaPlayer?.length ?: 0L
+        val duration = exoPlayer?.duration ?: 0L
         updateMediaMetadata(episodeId, title, duration)
         
         // Auto-hide episode info after 5 seconds
@@ -245,27 +297,35 @@ class PlayerActivity : AppCompatActivity() {
         }, 5000)
     }
 
+    @androidx.annotation.OptIn(UnstableApi::class)
     private fun playMedia(mediaUrl: String, startPosition: Long) {
         try {
-            mediaPlayer?.stop()
+            exoPlayer?.stop()
 
-            val media = Media(libVLC, Uri.parse(mediaUrl))
-            mediaPlayer?.media = media
+            // Build MediaItem with subtitle if available
+            val currentEpisode = viewModel.uiState.value?.currentEpisode
+            val mediaItemBuilder = MediaItem.Builder()
+                .setUri(Uri.parse(mediaUrl))
 
             // Add subtitle track if available
-            val currentEpisode = viewModel.uiState.value?.currentEpisode
             currentEpisode?.subtitleUrl?.let { subtitleUrl ->
                 Log.d(TAG, "Adding subtitle track: $subtitleUrl")
-                mediaPlayer?.addSlave(Slave.Type.Subtitle, subtitleUrl.toUri(), true)
-                Log.d(TAG, mediaPlayer?.spuTracks.toString())
+                val subtitle = MediaItem.SubtitleConfiguration.Builder(Uri.parse(subtitleUrl))
+                    .setMimeType(MimeTypes.APPLICATION_SUBRIP) // Assuming SRT format
+                    .setLanguage("en")
+                    .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+                    .build()
+                mediaItemBuilder.setSubtitleConfigurations(listOf(subtitle))
             }
 
-            media.release()
+            val mediaItem = mediaItemBuilder.build()
 
             Log.d(TAG, "Start Position: $startPosition")
 
-            mediaPlayer?.play()
-            mediaPlayer?.setTime(startPosition)
+            exoPlayer?.setMediaItem(mediaItem)
+            exoPlayer?.prepare()
+            exoPlayer?.seekTo(startPosition)
+            exoPlayer?.play()
             updatePlaybackState()
         } catch (e: Exception) {
             Log.e(TAG, "Error playing media: $mediaUrl", e)
@@ -290,7 +350,7 @@ class PlayerActivity : AppCompatActivity() {
         }
         
         playButton.setOnClickListener {
-            mediaPlayer?.let { player ->
+            exoPlayer?.let { player ->
                 if (player.isPlaying) {
                     player.pause()
                     playButton.text = getString(R.string.play)
@@ -317,10 +377,10 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun seekBackward() {
-        mediaPlayer?.let { player ->
-            val currentTime = player.time
+        exoPlayer?.let { player ->
+            val currentTime = player.currentPosition
             val newTime = (currentTime - SEEK_TIME_MS).coerceAtLeast(0L)
-            player.setTime(newTime)
+            player.seekTo(newTime)
             updateProgressBar()
             updatePlaybackState()
             Log.d(TAG, "Seeked backward to: ${newTime}ms")
@@ -328,11 +388,11 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun seekForward() {
-        mediaPlayer?.let { player ->
-            val currentTime = player.time
+        exoPlayer?.let { player ->
+            val currentTime = player.currentPosition
             val newTime = currentTime + SEEK_TIME_MS
-            // Note: VLC will handle seeking beyond the end of the video
-            player.setTime(newTime)
+            // ExoPlayer will handle seeking beyond the end of the video
+            player.seekTo(newTime)
             updateProgressBar()
             updatePlaybackState()
             Log.d(TAG, "Seeked forward to: ${newTime}ms")
@@ -340,9 +400,9 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun updateProgressBar() {
-        mediaPlayer?.let { player ->
-            val currentTime = player.time
-            val duration = player.length
+        exoPlayer?.let { player ->
+            val currentTime = player.currentPosition
+            val duration = player.duration
             if (duration > 0) {
                 val progress = ((currentTime.toDouble() / duration.toDouble()) * 100).toInt()
                 episodeProgressBar.progress = progress
@@ -354,46 +414,6 @@ class PlayerActivity : AppCompatActivity() {
         // Set click listener on the player container to toggle UI visibility
         playerContainer.setOnClickListener {
             toggleUiVisibility()
-        }
-
-        // Start auto-hide timer when video starts playing
-        mediaPlayer?.setEventListener { event ->
-            when (event.type) {
-                MediaPlayer.Event.EndReached -> {
-                    Log.d(TAG, "Episode ended, trying to play next.")
-                    viewModel.playNextEpisode()
-                    hideUi()
-                }
-                MediaPlayer.Event.Playing -> {
-                    loadingIndicator.visibility = View.GONE
-                    viewModel.startProgressUpdates { mediaPlayer?.time ?: 0L }
-                    resetAutoHideTimer()
-                    startProgressUpdates()
-                    updatePlaybackState()
-                }
-                MediaPlayer.Event.Paused -> {
-                    viewModel.stopProgressUpdates()
-                    cancelAutoHideTimer()
-                    stopProgressUpdates()
-                    updatePlaybackState()
-                }
-                MediaPlayer.Event.Stopped -> {
-                    viewModel.stopProgressUpdates()
-                    cancelAutoHideTimer()
-                    stopProgressUpdates()
-                    updatePlaybackState()
-                }
-                MediaPlayer.Event.EncounteredError -> {
-                    Log.e(TAG, "VLC Player Error")
-                    Toast.makeText(this, "Player Error", Toast.LENGTH_LONG).show()
-                    cancelAutoHideTimer()
-                    stopProgressUpdates()
-                    updatePlaybackState()
-                }
-                else -> {
-                    // Handle other events if needed
-                }
-            }
         }
     }
 
@@ -444,9 +464,9 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun resetAutoHideTimer() {
         cancelAutoHideTimer()
-        
+
         // Only start timer if video is playing
-        if (mediaPlayer?.isPlaying == true) {
+        if (exoPlayer?.isPlaying == true) {
             hideRunnable = Runnable {
                 hideUi()
             }
@@ -590,9 +610,9 @@ class PlayerActivity : AppCompatActivity() {
             }
         }
 
-        mediaPlayer?.play()
-        if (mediaPlayer?.isPlaying == true) {
-            viewModel.startProgressUpdates { mediaPlayer?.time ?: 0L }
+        exoPlayer?.play()
+        if (exoPlayer?.isPlaying == true) {
+            viewModel.startProgressUpdates { exoPlayer?.currentPosition ?: 0L }
             startProgressUpdates()
         }
     }
@@ -602,7 +622,7 @@ class PlayerActivity : AppCompatActivity() {
         viewModel.stopProgressUpdates()
         stopProgressUpdates()
         updatePlayback()
-        mediaPlayer?.pause()
+        exoPlayer?.pause()
     }
 
     override fun onStop() {
@@ -621,7 +641,7 @@ class PlayerActivity : AppCompatActivity() {
     private fun releasePlayer() {
         stopProgressUpdates()
         cancelAutoHideTimer()
-        mediaPlayer?.let { player ->
+        exoPlayer?.let { player ->
             try {
                 player.stop()
                 player.release()
@@ -629,14 +649,6 @@ class PlayerActivity : AppCompatActivity() {
                 Log.e(TAG, "Error releasing player", e)
             }
         }
-        libVLC?.let {
-            try {
-                it.release()
-            } catch (e: Exception) {
-                Log.e(TAG, "Error releasing libVLC", e)
-            }
-        }
-        libVLC = null
-        mediaPlayer = null
+        exoPlayer = null
     }
 }

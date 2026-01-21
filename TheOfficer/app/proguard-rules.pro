@@ -36,9 +36,10 @@
 -keep class com.google.gson.** { *; }
 -keep class com.rittme.theofficer.data.** { *; }
 
-# VLC
--keep class org.videolan.libvlc.** { *; }
--keep class org.videolan.medialibrary.** { *; }
+# ExoPlayer / Media3
+-keep class androidx.media3.** { *; }
+-keep interface androidx.media3.** { *; }
+-dontwarn androidx.media3.**
 
 # OkHttp
 -keep class okhttp3.** { *; }
