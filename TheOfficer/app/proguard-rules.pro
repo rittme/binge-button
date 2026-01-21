@@ -25,6 +25,9 @@
 -keep class retrofit2.** { *; }
 -keepattributes Signature
 -keepattributes Exceptions
+-keep,allowobfuscation,allowshrinking interface retrofit2.Call 
+-keep,allowobfuscation,allowshrinking class retrofit2.Response
+-keep,allowobfuscation,allowshrinking class kotlin.coroutines.Continuation 
 
 # Gson
 -keepattributes Signature
