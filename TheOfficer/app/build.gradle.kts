@@ -54,10 +54,6 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
-        jniLibs {
-            // Keep native libraries from ExoPlayer FFmpeg extension
-            useLegacyPackaging = false
-        }
     }
 }
 
@@ -83,8 +79,6 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer:1.5.0")
     implementation("androidx.media3:media3-ui:1.5.0")
     implementation("androidx.media3:media3-session:1.5.0")
-    // FFmpeg extension for software HEVC decoding fallback
-    implementation("androidx.media3:media3-decoder-ffmpeg:1.5.0")
     
     // If using Jellyfin API or custom API with Retrofit
     implementation(libs.retrofit)
