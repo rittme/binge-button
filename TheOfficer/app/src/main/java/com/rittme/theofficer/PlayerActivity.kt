@@ -105,9 +105,10 @@ class PlayerActivity : AppCompatActivity() {
     @androidx.annotation.OptIn(UnstableApi::class)
     private fun initializePlayer() {
         try {
-            // Initialize ExoPlayer with software decoder fallback
+            // Initialize ExoPlayer with software decoder fallback enabled
             val renderersFactory = DefaultRenderersFactory(this)
-                .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
+                .forceEnableMediaCodecAsynchronousQueueing()
+                .setEnableDecoderFallback(true)
 
             exoPlayer = ExoPlayer.Builder(this, renderersFactory)
                 .setSeekBackIncrementMs(SEEK_TIME_MS)
