@@ -41,6 +41,10 @@
 -keep interface androidx.media3.** { *; }
 -dontwarn androidx.media3.**
 
+# ExoPlayer FFmpeg extension
+-keep class androidx.media3.decoder.ffmpeg.** { *; }
+-dontwarn androidx.media3.decoder.ffmpeg.**
+
 # OkHttp
 -keep class okhttp3.** { *; }
 -keep class okio.** { *; }
