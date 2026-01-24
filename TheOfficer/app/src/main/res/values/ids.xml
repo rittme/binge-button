@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item type="id" name="exo_opacity_down" />
+    <item type="id" name="exo_opacity_up" />
+    <item type="id" name="exo_episode_picker" />
+</resources>

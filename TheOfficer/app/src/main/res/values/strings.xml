@@ -14,4 +14,7 @@
     <string name="error_no_episodes">No episodes available to play</string>
     <string name="show_finished">You\'ve finished the show!</string>
     <string name="first_episode">You are at the first episode</string>
+    <string name="opacity_up">Opacity up</string>
+    <string name="opacity_down">Opacity down</string>
+    <string name="episode_picker">Choose episode</string>
 </resources>
