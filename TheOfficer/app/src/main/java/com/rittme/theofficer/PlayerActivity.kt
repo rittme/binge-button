@@ -8,7 +8,8 @@ import android.util.Log
 import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
-import android.widget.ProgressBar
+import android.widget.FrameLayout
+import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.viewModels
@@ -49,13 +50,18 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private val handler = Handler(Looper.getMainLooper())
+    private val hideEpisodeInfoRunnable = Runnable { episodeDescription.visibility = View.GONE }
     private var isControllerVisible = false
     private var playlistMediaItems: List<MediaItem> = emptyList()
+    private var dimOverlayView: View? = null
+    private var dimAlpha = 0.0f
 
     companion object {
         private const val TAG = "PlayerActivity"
         private const val AUTO_HIDE_DELAY_MS = 4000L
         private const val EPISODE_INFO_HIDE_DELAY_MS = 5000L
+        private const val DIM_STEP = 0.1f
+        private const val DIM_MAX = 0.9f
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -66,6 +72,8 @@ class PlayerActivity : AppCompatActivity() {
         episodeDescription = findViewById(R.id.episode_description)
 
         initializePlayer()
+        setupDimOverlay()
+        setupOpacityControls()
         setupControllerVisibilityListener()
         setupViewModelObservers()
     }
@@ -275,10 +283,43 @@ class PlayerActivity : AppCompatActivity() {
                     episodeDescription.visibility = View.VISIBLE
                 } else {
                     isControllerVisible = false
+                    handler.removeCallbacks(hideEpisodeInfoRunnable)
                     episodeDescription.visibility = View.GONE
                 }
             }
         )
+    }
+
+    @androidx.annotation.OptIn(UnstableApi::class)
+    private fun setupDimOverlay() {
+        val overlayFrame = playerView.overlayFrameLayout ?: return
+        val overlay = View(this).apply {
+            setBackgroundColor(0xFF000000.toInt())
+            alpha = dimAlpha
+            isClickable = false
+            isFocusable = false
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        }
+        overlayFrame.addView(overlay, 0)
+        dimOverlayView = overlay
+    }
+
+    private fun setupOpacityControls() {
+        playerView.findViewById<ImageButton?>(R.id.exo_opacity_down)?.setOnClickListener {
+            adjustDim(DIM_STEP)
+        }
+        playerView.findViewById<ImageButton?>(R.id.exo_opacity_up)?.setOnClickListener {
+            adjustDim(-DIM_STEP)
+        }
+    }
+
+    private fun adjustDim(delta: Float) {
+        dimAlpha = (dimAlpha + delta).coerceIn(0.0f, DIM_MAX)
+        dimOverlayView?.alpha = dimAlpha
+        Log.d(TAG, "Dim opacity set to $dimAlpha")
     }
 
     private fun hideSystemUi() {
