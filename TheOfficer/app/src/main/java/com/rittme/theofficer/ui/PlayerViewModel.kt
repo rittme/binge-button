@@ -4,7 +4,6 @@ import android.util.Log
 import androidx.lifecycle.*
 import com.rittme.theofficer.data.EpisodeInfo
 import com.rittme.theofficer.data.PlaybackStateUpdateRequest
-import com.rittme.theofficer.data.ShowInfoResponse
 import com.rittme.theofficer.network.ApiService
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay

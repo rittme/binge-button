@@ -2,8 +2,6 @@ package com.rittme.theofficer
 
 import android.net.Uri
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import android.view.KeyEvent
 import android.view.View
@@ -52,9 +50,6 @@ class PlayerActivity : AppCompatActivity() {
         PlayerViewModel.PlayerViewModelFactory(apiService)
     }
 
-    private val handler = Handler(Looper.getMainLooper())
-    private val hideEpisodeInfoRunnable = Runnable { episodeDescription.visibility = View.GONE }
-    private var isControllerVisible = false
     private var playlistMediaItems: List<MediaItem> = emptyList()
     private var dimOverlayView: View? = null
     private var dimAlpha = 0.0f
@@ -71,7 +66,6 @@ class PlayerActivity : AppCompatActivity() {
     companion object {
         private const val TAG = "PlayerActivity"
         private const val AUTO_HIDE_DELAY_MS = 4000L
-        private const val EPISODE_INFO_HIDE_DELAY_MS = 5000L
         private const val DIM_STEP = 0.1f
         private const val DIM_MAX = 0.9f
     }
@@ -285,29 +279,12 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    private fun seekBackward() {
-        exoPlayer?.let { player ->
-            player.seekBack()
-            Log.d(TAG, "Seeked backward by ${SEEK_TIME_MS}ms")
-        }
-    }
-
-    private fun seekForward() {
-        exoPlayer?.let { player ->
-            player.seekForward()
-            Log.d(TAG, "Seeked forward by ${SEEK_TIME_MS}ms")
-        }
-    }
-
     private fun setupControllerVisibilityListener() {
         playerView.setControllerVisibilityListener(
             PlayerView.ControllerVisibilityListener { visibility: Int ->
                 if (visibility == View.VISIBLE) {
-                    isControllerVisible = true
                     episodeDescription.visibility = View.VISIBLE
                 } else {
-                    isControllerVisible = false
-                    handler.removeCallbacks(hideEpisodeInfoRunnable)
                     episodeDescription.visibility = View.GONE
                 }
             }
@@ -618,8 +595,6 @@ class PlayerActivity : AppCompatActivity() {
         releasePlayer()
         mediaSession?.release()
         mediaSession = null
-        // Clean up any remaining handlers
-        handler.removeCallbacksAndMessages(null)
     }
 
     private fun releasePlayer() {
