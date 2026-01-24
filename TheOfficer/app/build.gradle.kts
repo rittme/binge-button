@@ -10,8 +10,8 @@ android {
 
     defaultConfig {
         applicationId = "com.rittme.theofficer"
-        minSdk = 21
-        targetSdk = 35
+        minSdk = 23
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0"
 
@@ -76,9 +76,9 @@ dependencies {
     debugImplementation(libs.androidx.ui.test.manifest)
 
     // ExoPlayer (Media3) dependencies
-    implementation("androidx.media3:media3-exoplayer:1.5.0")
-    implementation("androidx.media3:media3-ui:1.5.0")
-    implementation("androidx.media3:media3-session:1.5.0")
+    implementation("androidx.media3:media3-exoplayer:1.9.0")
+    implementation("androidx.media3:media3-ui:1.9.0")
+    implementation("androidx.media3:media3-session:1.9.0")
     
     // If using Jellyfin API or custom API with Retrofit
     implementation(libs.retrofit)

@@ -21,90 +21,11 @@
             android:id="@+id/player_view"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            app:use_controller="false"
+            app:use_controller="true"
             app:surface_type="texture_view"
             app:resize_mode="fit" />
 
     </FrameLayout>
-
-    <LinearLayout
-        android:id="@+id/custom_button_layout"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_marginBottom="32dp"
-        android:padding="8dp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        style="?android:attr/buttonBarStyle">
-
-
-        <Button
-            android:id="@+id/button_previous_episode"
-            style="?android:attr/buttonBarButtonStyle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="16dp"
-            android:text="@string/previous"
-            android:background="@drawable/button_selector_tv"
-            android:textColor="@color/button_text"
-            android:textSize="24sp"
-            android:paddingHorizontal="24dp"
-            android:paddingVertical="12dp" />
-
-        <Button
-            android:id="@+id/button_seek_backward"
-            style="?android:attr/buttonBarButtonStyle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="16dp"
-            android:text="@string/seek_backward"
-            android:background="@drawable/button_selector_tv"
-            android:textColor="@color/button_text"
-            android:textSize="24sp"
-            android:paddingHorizontal="24dp"
-            android:paddingVertical="12dp" />
-
-        <Button
-            android:id="@+id/button_play_pause"
-            style="?android:attr/buttonBarButtonStyle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="16dp"
-            android:text="@string/playpause"
-            android:background="@drawable/button_selector_tv"
-            android:textColor="@color/button_text"
-            android:textSize="24sp"
-            android:paddingHorizontal="24dp"
-            android:paddingVertical="12dp"/>
-
-        <Button
-            android:id="@+id/button_seek_forward"
-            style="?android:attr/buttonBarButtonStyle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="16dp"
-            android:text="@string/seek_forward"
-            android:background="@drawable/button_selector_tv"
-            android:textColor="@color/button_text"
-            android:textSize="24sp"
-            android:paddingHorizontal="24dp"
-            android:paddingVertical="12dp"/>
-
-        <Button
-            android:id="@+id/button_next_episode"
-            style="?android:attr/buttonBarButtonStyle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/next"
-            android:background="@drawable/button_selector_tv"
-            android:textColor="@color/button_text"
-            android:textSize="24sp"
-            android:paddingHorizontal="24dp"
-            android:paddingVertical="12dp"/>
-
-    </LinearLayout>
 
     <ProgressBar
         android:id="@+id/loading_indicator"
@@ -135,16 +56,5 @@
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
-
-    <ProgressBar
-        android:id="@+id/episode_progress_bar"
-        style="?android:attr/progressBarStyleHorizontal"
-        android:layout_width="0dp"
-        android:layout_height="6dp"
-        android:background="#0C000000"
-        android:progressTint="@color/button_focused"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
