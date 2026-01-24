@@ -15,6 +15,7 @@ import android.util.Log
 import android.view.KeyEvent
 import android.view.SurfaceView
 import android.view.View
+import android.view.WindowManager
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -155,11 +156,13 @@ class PlayerActivity : AppCompatActivity() {
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             if (isPlaying) {
+                setPreventAmbientMode(true)
                 viewModel.startProgressUpdates { exoPlayer?.currentPosition ?: 0L }
                 resetAutoHideTimer()
                 startProgressUpdates()
                 playButton.text = getString(R.string.pause)
             } else {
+                setPreventAmbientMode(false)
                 viewModel.stopProgressUpdates()
                 cancelAutoHideTimer()
                 stopProgressUpdates()
@@ -494,6 +497,14 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
+    private fun setPreventAmbientMode(enabled: Boolean) {
+        if (enabled) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
+
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         // Handle Android TV remote control buttons
         when (keyCode) {
@@ -628,6 +639,7 @@ class PlayerActivity : AppCompatActivity() {
         stopProgressUpdates()
         updatePlayback()
         exoPlayer?.pause()
+        setPreventAmbientMode(false)
     }
 
     override fun onStop() {
