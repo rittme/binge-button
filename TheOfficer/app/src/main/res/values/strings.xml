@@ -17,4 +17,8 @@
     <string name="opacity_up">Opacity up</string>
     <string name="opacity_down">Opacity down</string>
     <string name="episode_picker">Choose episode</string>
+    <string name="episode_picker_season_title">Choose Season</string>
+    <string name="episode_picker_episode_title">Choose Episode</string>
+    <string name="episode_picker_back">Back</string>
+    <string name="episode_picker_close">Close</string>
 </resources>

@@ -10,8 +10,11 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.ImageButton
+import android.widget.Button
+import android.widget.ListView
 import android.widget.TextView
 import android.widget.Toast
+import android.widget.ArrayAdapter
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
@@ -55,6 +58,15 @@ class PlayerActivity : AppCompatActivity() {
     private var playlistMediaItems: List<MediaItem> = emptyList()
     private var dimOverlayView: View? = null
     private var dimAlpha = 0.0f
+    private var episodePickerOverlay: View? = null
+    private var episodePickerList: ListView? = null
+    private var episodePickerTitle: TextView? = null
+    private var episodePickerBack: Button? = null
+    private var episodePickerClose: Button? = null
+    private var episodePickerMode = EpisodePickerMode.SEASONS
+    private var episodePickerSeasons: List<SeasonGroup> = emptyList()
+    private var currentSeasonGroup: SeasonGroup? = null
+    private var episodePickerSelectedIndex = 0
 
     companion object {
         private const val TAG = "PlayerActivity"
@@ -63,6 +75,17 @@ class PlayerActivity : AppCompatActivity() {
         private const val DIM_STEP = 0.1f
         private const val DIM_MAX = 0.9f
     }
+
+    private enum class EpisodePickerMode {
+        SEASONS,
+        EPISODES
+    }
+
+    private data class SeasonGroup(
+        val seasonNumber: Int?,
+        val label: String,
+        val episodes: List<EpisodeInfo>
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -74,6 +97,7 @@ class PlayerActivity : AppCompatActivity() {
         initializePlayer()
         setupDimOverlay()
         setupOpacityControls()
+        setupEpisodePicker()
         setupControllerVisibilityListener()
         setupViewModelObservers()
     }
@@ -314,6 +338,218 @@ class PlayerActivity : AppCompatActivity() {
         playerView.findViewById<ImageButton?>(R.id.exo_opacity_up)?.setOnClickListener {
             adjustDim(-DIM_STEP)
         }
+    }
+
+    private fun setupEpisodePicker() {
+        episodePickerOverlay = findViewById(R.id.episode_picker_overlay)
+        episodePickerList = findViewById(R.id.episode_picker_list)
+        episodePickerTitle = findViewById(R.id.episode_picker_title)
+        episodePickerBack = findViewById(R.id.episode_picker_back)
+        episodePickerClose = findViewById(R.id.episode_picker_close)
+
+        findViewById<View?>(R.id.episode_picker_panel)?.setOnClickListener {
+            // Consume clicks so only the background dismisses.
+        }
+        episodePickerOverlay?.setOnClickListener { hideEpisodePicker() }
+
+        episodePickerBack?.setOnClickListener {
+            if (episodePickerMode == EpisodePickerMode.EPISODES) {
+                showSeasonMenu()
+            } else {
+                hideEpisodePicker()
+            }
+        }
+        episodePickerClose?.setOnClickListener { hideEpisodePicker() }
+
+        episodePickerList?.setOnItemClickListener { _, _, position, _ ->
+            when (episodePickerMode) {
+                EpisodePickerMode.SEASONS -> {
+                    episodePickerSeasons.getOrNull(position)?.let { season ->
+                        showEpisodeMenu(season)
+                    }
+                }
+                EpisodePickerMode.EPISODES -> {
+                    val seasonGroup = currentSeasonGroup ?: return@setOnItemClickListener
+                    val episode = seasonGroup.episodes.getOrNull(position) ?: return@setOnItemClickListener
+                    val allEpisodes = viewModel.uiState.value?.allEpisodes.orEmpty()
+                    val index = allEpisodes.indexOfFirst { it.id == episode.id }
+                    if (index != -1) {
+                        viewModel.syncToEpisodeIndex(index)
+                    }
+                    hideEpisodePicker()
+                }
+            }
+        }
+
+        playerView.findViewById<ImageButton?>(R.id.exo_episode_picker)?.setOnClickListener {
+            showSeasonMenu()
+        }
+    }
+
+    private fun showSeasonMenu() {
+        val episodes = viewModel.uiState.value?.allEpisodes.orEmpty()
+        if (episodes.isEmpty()) {
+            Toast.makeText(this, getString(R.string.error_no_episodes), Toast.LENGTH_LONG).show()
+            return
+        }
+
+        episodePickerSeasons = buildSeasonGroups(episodes)
+        episodePickerMode = EpisodePickerMode.SEASONS
+        currentSeasonGroup = null
+        episodePickerTitle?.setText(R.string.episode_picker_season_title)
+        episodePickerBack?.visibility = View.INVISIBLE
+
+        val currentSeasonNumber = viewModel.uiState.value?.currentEpisode?.let { parseSeasonNumber(it.id) }
+        episodePickerSelectedIndex = episodePickerSeasons.indexOfFirst {
+            it.seasonNumber != null && it.seasonNumber == currentSeasonNumber
+        }.takeIf { it >= 0 } ?: 0
+
+        val items = episodePickerSeasons.map { formatSeasonDisplay(it) }
+        updateEpisodePickerList(items)
+        showEpisodePicker()
+    }
+
+    private fun showEpisodeMenu(seasonGroup: SeasonGroup) {
+        episodePickerMode = EpisodePickerMode.EPISODES
+        currentSeasonGroup = seasonGroup
+        episodePickerTitle?.setText(R.string.episode_picker_episode_title)
+        episodePickerBack?.visibility = View.VISIBLE
+
+        val currentEpisodeId = viewModel.uiState.value?.currentEpisode?.id
+        episodePickerSelectedIndex = seasonGroup.episodes.indexOfFirst { it.id == currentEpisodeId }
+            .takeIf { it >= 0 } ?: 0
+
+        val items = seasonGroup.episodes.map { formatEpisodeDisplay(it) }
+        updateEpisodePickerList(items)
+        showEpisodePicker()
+    }
+
+    private fun showEpisodePicker() {
+        episodePickerOverlay?.visibility = View.VISIBLE
+        episodePickerOverlay?.bringToFront()
+        episodePickerList?.requestFocus()
+        episodePickerList?.setSelection(episodePickerSelectedIndex)
+        episodePickerList?.setItemChecked(episodePickerSelectedIndex, true)
+    }
+
+    private fun hideEpisodePicker() {
+        episodePickerOverlay?.visibility = View.GONE
+    }
+
+    private fun updateEpisodePickerList(items: List<String>) {
+        episodePickerList?.adapter = ArrayAdapter(
+            this,
+            R.layout.episode_picker_list_item,
+            items
+        )
+        episodePickerList?.choiceMode = ListView.CHOICE_MODE_SINGLE
+        episodePickerList?.setSelection(episodePickerSelectedIndex)
+        episodePickerList?.setItemChecked(episodePickerSelectedIndex, true)
+    }
+
+    private fun moveEpisodePickerSelection(delta: Int) {
+        val list = episodePickerList ?: return
+        val count = list.adapter?.count ?: 0
+        if (count == 0) return
+        episodePickerSelectedIndex = (episodePickerSelectedIndex + delta).coerceIn(0, count - 1)
+        list.setSelection(episodePickerSelectedIndex)
+        list.setItemChecked(episodePickerSelectedIndex, true)
+    }
+
+    private fun activateEpisodePickerSelection() {
+        val position = episodePickerSelectedIndex
+        when (episodePickerMode) {
+            EpisodePickerMode.SEASONS -> {
+                episodePickerSeasons.getOrNull(position)?.let { season ->
+                    showEpisodeMenu(season)
+                }
+            }
+            EpisodePickerMode.EPISODES -> {
+                val seasonGroup = currentSeasonGroup ?: return
+                val episode = seasonGroup.episodes.getOrNull(position) ?: return
+                val allEpisodes = viewModel.uiState.value?.allEpisodes.orEmpty()
+                val index = allEpisodes.indexOfFirst { it.id == episode.id }
+                if (index != -1) {
+                    viewModel.syncToEpisodeIndex(index)
+                }
+                hideEpisodePicker()
+            }
+        }
+    }
+
+    private fun buildSeasonGroups(episodes: List<EpisodeInfo>): List<SeasonGroup> {
+        val grouped = episodes.groupBy { parseSeasonNumber(it.id) }
+        return grouped.entries.map { (seasonNumber, groupEpisodes) ->
+            val label = if (seasonNumber != null) "Season $seasonNumber" else "Season ?"
+            val sortedEpisodes = groupEpisodes.sortedWith(
+                compareBy<EpisodeInfo> { parseEpisodeNumber(it.id) ?: Int.MAX_VALUE }
+                    .thenBy { it.id }
+            )
+            SeasonGroup(seasonNumber, label, sortedEpisodes)
+        }.sortedWith(compareBy<SeasonGroup> { it.seasonNumber ?: Int.MAX_VALUE })
+    }
+
+    private fun parseSeasonNumber(episodeId: String): Int? {
+        val match = Regex("S(\\d{1,2})E(\\d{1,2})", RegexOption.IGNORE_CASE).find(episodeId)
+        return match?.groupValues?.getOrNull(1)?.toIntOrNull()
+    }
+
+    private fun parseEpisodeNumber(episodeId: String): Int? {
+        val match = Regex("S(\\d{1,2})E(\\d{1,2})", RegexOption.IGNORE_CASE).find(episodeId)
+        return match?.groupValues?.getOrNull(2)?.toIntOrNull()
+    }
+
+    private fun formatSeasonDisplay(seasonGroup: SeasonGroup): String {
+        return "${seasonGroup.label} (${seasonGroup.episodes.size})"
+    }
+
+    private fun formatEpisodeDisplay(episode: EpisodeInfo): String {
+        val episodeNumber = parseEpisodeNumber(episode.id)
+        val prefix = if (episodeNumber != null) {
+            "E${episodeNumber.toString().padStart(2, '0')}"
+        } else {
+            episode.id
+        }
+        return if (!episode.title.isNullOrBlank()) {
+            "$prefix - ${episode.title}"
+        } else {
+            prefix
+        }
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val overlayVisible = episodePickerOverlay?.visibility == View.VISIBLE
+        if (overlayVisible && event.action == KeyEvent.ACTION_DOWN) {
+            when (event.keyCode) {
+                KeyEvent.KEYCODE_DPAD_UP -> {
+                    moveEpisodePickerSelection(-1)
+                    return true
+                }
+                KeyEvent.KEYCODE_DPAD_DOWN -> {
+                    moveEpisodePickerSelection(1)
+                    return true
+                }
+                KeyEvent.KEYCODE_DPAD_LEFT -> {
+                    if (episodePickerMode == EpisodePickerMode.EPISODES) {
+                        showSeasonMenu()
+                    } else {
+                        hideEpisodePicker()
+                    }
+                    return true
+                }
+                KeyEvent.KEYCODE_DPAD_RIGHT,
+                KeyEvent.KEYCODE_DPAD_CENTER,
+                KeyEvent.KEYCODE_ENTER -> {
+                    activateEpisodePickerSelection()
+                    return true
+                }
+                KeyEvent.KEYCODE_BACK -> {
+                    hideEpisodePicker()
+                    return true
+                }
+            }
+        }
+        return super.dispatchKeyEvent(event)
     }
 
     private fun adjustDim(delta: Float) {
