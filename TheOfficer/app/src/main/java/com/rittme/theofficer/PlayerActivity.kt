@@ -39,7 +39,6 @@ class PlayerActivity : AppCompatActivity() {
 
     private lateinit var playerView: PlayerView
     private var exoPlayer: ExoPlayer? = null
-    private lateinit var loadingIndicator: ProgressBar
     private lateinit var episodeDescription: TextView
     private var mediaSession: MediaSession? = null
     private var playlistEpisodeIds: List<String> = emptyList()
@@ -50,7 +49,6 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private val handler = Handler(Looper.getMainLooper())
-    private val hideEpisodeInfoRunnable = Runnable { episodeDescription.visibility = View.GONE }
     private var isControllerVisible = false
     private var playlistMediaItems: List<MediaItem> = emptyList()
 
@@ -65,7 +63,6 @@ class PlayerActivity : AppCompatActivity() {
         setContentView(R.layout.activity_player)
 
         playerView = findViewById(R.id.player_view)
-        loadingIndicator = findViewById(R.id.loading_indicator)
         episodeDescription = findViewById(R.id.episode_description)
 
         initializePlayer()
@@ -91,6 +88,7 @@ class PlayerActivity : AppCompatActivity() {
                     playerView.setControllerShowTimeoutMs(AUTO_HIDE_DELAY_MS.toInt())
                     playerView.setShowNextButton(true)
                     playerView.setShowPreviousButton(true)
+                    playerView.setShowBuffering(PlayerView.SHOW_BUFFERING_ALWAYS)
 
                     // Add player event listener
                     player.addListener(playerListener)
@@ -108,7 +106,6 @@ class PlayerActivity : AppCompatActivity() {
                     Log.d(TAG, "Episode ended.")
                 }
                 Player.STATE_READY -> {
-                    loadingIndicator.visibility = View.GONE
                     if (exoPlayer?.isPlaying == true) {
                         viewModel.startProgressUpdates { exoPlayer?.currentPosition ?: 0L }
                     }
@@ -121,9 +118,6 @@ class PlayerActivity : AppCompatActivity() {
                                 "commands=${player.availableCommands}"
                         )
                     }
-                }
-                Player.STATE_BUFFERING -> {
-                    loadingIndicator.visibility = View.VISIBLE
                 }
             }
         }
@@ -169,8 +163,6 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun setupViewModelObservers() {
         viewModel.uiState.observe(this) { state ->
-            loadingIndicator.visibility = if (state.isLoading) View.VISIBLE else View.GONE
-
             state.error?.let {
                 Log.e(TAG, "UI State Error: $it")
                 Toast.makeText(this, it, Toast.LENGTH_LONG).show()
@@ -195,7 +187,6 @@ class PlayerActivity : AppCompatActivity() {
             episodeId
         }
         episodeDescription.text = displayText
-        showEpisodeInfoBriefly()
     }
 
     private fun ensurePlaylistAndPlay(state: PlayerUiState, episode: EpisodeInfo) {
@@ -275,21 +266,15 @@ class PlayerActivity : AppCompatActivity() {
             Log.d(TAG, "Seeked forward by ${SEEK_TIME_MS}ms")
         }
     }
-    private fun showEpisodeInfoBriefly() {
-        episodeDescription.visibility = View.VISIBLE
-        handler.removeCallbacks(hideEpisodeInfoRunnable)
-        handler.postDelayed(hideEpisodeInfoRunnable, EPISODE_INFO_HIDE_DELAY_MS)
-    }
 
     private fun setupControllerVisibilityListener() {
         playerView.setControllerVisibilityListener(
             PlayerView.ControllerVisibilityListener { visibility: Int ->
                 if (visibility == View.VISIBLE) {
                     isControllerVisible = true
-                    showEpisodeInfoBriefly()
+                    episodeDescription.visibility = View.VISIBLE
                 } else {
                     isControllerVisible = false
-                    handler.removeCallbacks(hideEpisodeInfoRunnable)
                     episodeDescription.visibility = View.GONE
                 }
             }
@@ -310,49 +295,6 @@ class PlayerActivity : AppCompatActivity() {
         } else {
             window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
-    }
-
-    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        // Handle Android TV remote control buttons
-        when (keyCode) {
-            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
-            KeyEvent.KEYCODE_DPAD_CENTER,
-            KeyEvent.KEYCODE_ENTER -> {
-                exoPlayer?.let { player ->
-                    if (player.isPlaying) {
-                        player.pause()
-                    } else {
-                        player.play()
-                    }
-                }
-                playerView.showController()
-                showEpisodeInfoBriefly()
-                return true
-            }
-            KeyEvent.KEYCODE_DPAD_UP,
-            KeyEvent.KEYCODE_DPAD_DOWN -> {
-                playerView.showController()
-                showEpisodeInfoBriefly()
-                return true
-            }
-            KeyEvent.KEYCODE_DPAD_LEFT -> {
-                seekBackward()
-                playerView.showController()
-                return true
-            }
-            KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                seekForward()
-                playerView.showController()
-                return true
-            }
-            KeyEvent.KEYCODE_BACK -> {
-                if (isControllerVisible) {
-                    playerView.hideController()
-                    return true
-                }
-            }
-        }
-        return super.onKeyDown(keyCode, event)
     }
 
     override fun onStart() {
