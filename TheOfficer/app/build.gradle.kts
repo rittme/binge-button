@@ -59,9 +59,9 @@ dependencies {
     implementation(libs.androidx.constraintlayout)
     implementation(libs.androidx.media)
     // ExoPlayer (Media3) dependencies
-    implementation("androidx.media3:media3-exoplayer:1.9.0")
-    implementation("androidx.media3:media3-ui:1.9.0")
-    implementation("androidx.media3:media3-session:1.9.0")
+    implementation("androidx.media3:media3-exoplayer:1.4.0")
+    implementation("androidx.media3:media3-ui:1.4.0")
+    implementation("androidx.media3:media3-session:1.4.0")
     
     // If using Jellyfin API or custom API with Retrofit
     implementation(libs.retrofit)

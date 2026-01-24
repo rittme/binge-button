@@ -15,9 +15,11 @@ import android.widget.Toast
 import android.widget.ArrayAdapter
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AlertDialog
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.core.view.isVisible
 import com.rittme.theofficer.network.ApiService
 import com.rittme.theofficer.ui.PlayerUiState
 import com.rittme.theofficer.ui.PlayerViewModel
@@ -33,6 +35,7 @@ import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.session.MediaSession
 import androidx.media3.ui.PlayerView
 import com.rittme.theofficer.data.EpisodeInfo
+import java.io.File
 import kotlin.math.abs
 
 
@@ -88,6 +91,7 @@ class PlayerActivity : AppCompatActivity() {
         playerView = findViewById(R.id.player_view)
         episodeDescription = findViewById(R.id.episode_description)
 
+        showLastCrashIfAny()
         initializePlayer()
         setupDimOverlay()
         setupOpacityControls()
@@ -529,6 +533,19 @@ class PlayerActivity : AppCompatActivity() {
         return super.dispatchKeyEvent(event)
     }
 
+    override fun onBackPressed() {
+        if (episodePickerOverlay?.visibility == View.VISIBLE) {
+            hideEpisodePicker()
+            return
+        }
+        @UnstableApi
+        if (playerView.isControllerFullyVisible) {
+            playerView.hideController()
+            return
+        }
+        // Intentionally do nothing to prevent closing the app.
+    }
+
     private fun adjustDim(delta: Float) {
         dimAlpha = (dimAlpha + delta).coerceIn(0.0f, DIM_MAX)
         dimOverlayView?.alpha = dimAlpha
@@ -541,6 +558,28 @@ class PlayerActivity : AppCompatActivity() {
             controller.hide(WindowInsetsCompat.Type.systemBars())
             controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
+    }
+
+    private fun showLastCrashIfAny() {
+        val crashFile = File(filesDir, CrashReportingApp.CRASH_FILE_NAME)
+        if (!crashFile.exists()) return
+        val crashText = runCatching { crashFile.readText() }.getOrNull() ?: return
+
+        val messageView = TextView(this).apply {
+            text = crashText
+            setTextIsSelectable(true)
+            setPadding(32, 24, 32, 24)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Last crash report")
+            .setView(messageView)
+            .setCancelable(true)
+            .setPositiveButton("Clear") { _, _ ->
+                crashFile.delete()
+            }
+            .setNegativeButton("Keep", null)
+            .show()
     }
 
     private fun setPreventAmbientMode(enabled: Boolean) {
