@@ -95,6 +95,7 @@ class PlayerViewModel(private val apiService: ApiService) : ViewModel() {
                     retryCount = 0
                     currentEpisodeIndex = allEpisodes.indexOfFirst { it.id == currentEpisodeId }
                     if (currentEpisodeIndex == -1) {
+                        Log.w(TAG, "Current episode id not found in list: $currentEpisodeId. Falling back to index 0.")
                         currentEpisodeIndex = 0
                     }
 
@@ -109,6 +110,10 @@ class PlayerViewModel(private val apiService: ApiService) : ViewModel() {
                         allEpisodes = allEpisodes
                     )
 
+                    Log.d(
+                        TAG,
+                        "Loaded ${allEpisodes.size} episodes. Current id=$currentEpisodeId index=$currentEpisodeIndex"
+                    )
                     Log.d(TAG, "Successfully loaded ${allEpisodes.size} episodes")
                     return // Success - exit retry loop
 
@@ -155,6 +160,7 @@ class PlayerViewModel(private val apiService: ApiService) : ViewModel() {
 
         val nextIndex = currentEpisodeIndex + 1
         if (nextIndex < allEpisodes.size) {
+            Log.d(TAG, "Advancing to next episode: $currentEpisodeIndex -> $nextIndex")
             currentEpisodeIndex = nextIndex
             val nextEpisode = allEpisodes[currentEpisodeIndex]
             currentEpisodeId = nextEpisode.id
@@ -172,12 +178,18 @@ class PlayerViewModel(private val apiService: ApiService) : ViewModel() {
         }
     }
 
+    fun hasNextEpisode(): Boolean {
+        if (allEpisodes.isEmpty() || currentEpisodeIndex == -1) return false
+        return currentEpisodeIndex + 1 < allEpisodes.size
+    }
+
     fun playPreviousEpisode() {
         if (allEpisodes.isEmpty() || currentEpisodeIndex == -1) return
         stopProgressUpdates()
 
         val prevIndex = currentEpisodeIndex - 1
         if (prevIndex >= 0) {
+            Log.d(TAG, "Going to previous episode: $currentEpisodeIndex -> $prevIndex")
             currentEpisodeIndex = prevIndex
             val prevEpisode = allEpisodes[currentEpisodeIndex]
             currentEpisodeId = prevEpisode.id
@@ -190,6 +202,24 @@ class PlayerViewModel(private val apiService: ApiService) : ViewModel() {
             // At the beginning
              _uiState.value = _uiState.value?.copy(error = "You are at the first episode.")
         }
+    }
+
+    fun hasPreviousEpisode(): Boolean {
+        if (allEpisodes.isEmpty() || currentEpisodeIndex == -1) return false
+        return currentEpisodeIndex - 1 >= 0
+    }
+
+    fun syncToEpisodeIndex(index: Int) {
+        if (allEpisodes.isEmpty() || index !in allEpisodes.indices) return
+        if (index == currentEpisodeIndex) return
+        currentEpisodeIndex = index
+        val episode = allEpisodes[index]
+        currentEpisodeId = episode.id
+        _uiState.value = _uiState.value?.copy(
+            currentEpisode = episode,
+            startPositionMs = 0L
+        )
+        updatePlaybackState(0L)
     }
 
 
