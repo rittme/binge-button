@@ -16,6 +16,7 @@ import android.widget.ArrayAdapter
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -120,12 +121,50 @@ class PlayerActivity : AppCompatActivity() {
                     playerView.setShowPreviousButton(true)
                     playerView.setShowBuffering(PlayerView.SHOW_BUFFERING_ALWAYS)
 
+                    // Apply focus backgrounds to all control buttons (TV-friendly)
+                    applyFocusBackgroundToControlButtons()
+
                     // Add player event listener
                     player.addListener(playerListener)
                 }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize ExoPlayer", e)
             Toast.makeText(this, getString(R.string.error_player_init), Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun applyFocusBackgroundToControlButtons() {
+        // Center control button IDs from Media3 UI library
+        val centerButtonIds = listOf(
+            androidx.media3.ui.R.id.exo_prev,
+            androidx.media3.ui.R.id.exo_rew_with_amount,
+            androidx.media3.ui.R.id.exo_play_pause,
+            androidx.media3.ui.R.id.exo_ffwd_with_amount,
+            androidx.media3.ui.R.id.exo_next
+        )
+
+        // Bottom bar button IDs from Media3 UI library
+        val bottomBarMedia3Ids = listOf(
+            androidx.media3.ui.R.id.exo_vr,
+            androidx.media3.ui.R.id.exo_shuffle,
+            androidx.media3.ui.R.id.exo_repeat_toggle,
+            androidx.media3.ui.R.id.exo_subtitle,
+            androidx.media3.ui.R.id.exo_fullscreen,
+            androidx.media3.ui.R.id.exo_overflow_show
+        )
+
+        // Bottom bar button IDs from app (custom buttons)
+        val bottomBarAppIds = listOf(
+            R.id.exo_opacity_down,
+            R.id.exo_opacity_up,
+            R.id.exo_episode_picker
+        )
+
+        val allButtonIds = centerButtonIds + bottomBarMedia3Ids + bottomBarAppIds
+
+        allButtonIds.forEach { buttonId ->
+            playerView.findViewById<View>(buttonId)?.background =
+                AppCompatResources.getDrawable(this, R.drawable.controls_focus_background)
         }
     }
 
@@ -529,21 +568,18 @@ class PlayerActivity : AppCompatActivity() {
                     return true
                 }
             }
+        } else if(!overlayVisible &&
+            event.action == KeyEvent.ACTION_DOWN &&
+            event.keyCode == KeyEvent.KEYCODE_BACK){
+            @UnstableApi
+            if (playerView.isControllerFullyVisible ) {
+                playerView.hideController()
+                return true
+            } else {
+                return true
+            }
         }
         return super.dispatchKeyEvent(event)
-    }
-
-    override fun onBackPressed() {
-        if (episodePickerOverlay?.visibility == View.VISIBLE) {
-            hideEpisodePicker()
-            return
-        }
-        @UnstableApi
-        if (playerView.isControllerFullyVisible) {
-            playerView.hideController()
-            return
-        }
-        // Intentionally do nothing to prevent closing the app.
     }
 
     private fun adjustDim(delta: Float) {
