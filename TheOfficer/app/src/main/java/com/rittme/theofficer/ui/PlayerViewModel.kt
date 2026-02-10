@@ -14,7 +14,8 @@ data class PlayerUiState(
     val startPositionMs: Long = 0L,
     val isLoading: Boolean = true,
     val error: String? = null,
-    val allEpisodes: List<EpisodeInfo> = emptyList()
+    val allEpisodes: List<EpisodeInfo> = emptyList(),
+    val shutdownTimerRemainingMinutes: Int? = null
 )
 
 class PlayerViewModel(private val apiService: ApiService) : ViewModel() {
@@ -28,6 +29,7 @@ class PlayerViewModel(private val apiService: ApiService) : ViewModel() {
 
     private var progressUpdateJob: Job? = null
     private var fetchJob: Job? = null
+    private var shutdownTimerJob: Job? = null
     private var retryCount = 0
 
     companion object {
@@ -35,6 +37,7 @@ class PlayerViewModel(private val apiService: ApiService) : ViewModel() {
         private const val PROGRESS_UPDATE_INTERVAL_MS = 15_000L // 15 seconds
         private const val MAX_RETRY_ATTEMPTS = 5
         private const val INITIAL_RETRY_DELAY_MS = 2000L // 2 seconds
+        private const val SHUTDOWN_TIMER_UPDATE_INTERVAL_MS = 60_000L // 1 minute
     }
 
     init {
@@ -257,6 +260,45 @@ class PlayerViewModel(private val apiService: ApiService) : ViewModel() {
                 Log.e(TAG, "Error updating progress: ", e)
             }
         }
+    }
+
+    fun startShutdownTimer(durationMinutes: Int, onShutdown: () -> Unit) {
+        cancelShutdownTimer()
+        Log.d(TAG, "Starting shutdown timer for $durationMinutes minutes")
+
+        shutdownTimerJob = viewModelScope.launch {
+            var remainingMinutes = durationMinutes
+            _uiState.value = _uiState.value?.copy(shutdownTimerRemainingMinutes = remainingMinutes)
+
+            while (remainingMinutes > 0) {
+                delay(SHUTDOWN_TIMER_UPDATE_INTERVAL_MS)
+                remainingMinutes--
+                _uiState.value = _uiState.value?.copy(shutdownTimerRemainingMinutes = remainingMinutes)
+                Log.d(TAG, "Shutdown timer: $remainingMinutes minutes remaining")
+            }
+
+            Log.d(TAG, "Shutdown timer completed, executing shutdown")
+            _uiState.value = _uiState.value?.copy(shutdownTimerRemainingMinutes = null)
+            onShutdown()
+        }
+    }
+
+    fun cancelShutdownTimer() {
+        shutdownTimerJob?.cancel()
+        shutdownTimerJob = null
+        _uiState.value = _uiState.value?.copy(shutdownTimerRemainingMinutes = null)
+        Log.d(TAG, "Shutdown timer cancelled")
+    }
+
+    fun isShutdownTimerActive(): Boolean {
+        return shutdownTimerJob?.isActive == true
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        progressUpdateJob?.cancel()
+        fetchJob?.cancel()
+        shutdownTimerJob?.cancel()
     }
 
     // For providing ViewModel with dependencies (like ApiService)

@@ -3,4 +3,5 @@
     <item type="id" name="exo_opacity_down" />
     <item type="id" name="exo_opacity_up" />
     <item type="id" name="exo_episode_picker" />
+    <item type="id" name="exo_shutdown_timer" />
 </resources>

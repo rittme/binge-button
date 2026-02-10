@@ -21,4 +21,17 @@
     <string name="episode_picker_episode_title">Choose Episode</string>
     <string name="episode_picker_back">Back</string>
     <string name="episode_picker_close">Close</string>
+    <string name="shutdown_timer">Sleep timer</string>
+    <string name="shutdown_timer_title">Set Sleep Timer</string>
+    <string name="shutdown_timer_off">Off</string>
+    <string name="shutdown_timer_15">15 minutes</string>
+    <string name="shutdown_timer_30">30 minutes</string>
+    <string name="shutdown_timer_45">45 minutes</string>
+    <string name="shutdown_timer_60">1 hour</string>
+    <string name="shutdown_timer_120">2 hours</string>
+    <string name="shutdown_timer_active">Sleep in %1$d min</string>
+    <string name="shutdown_timer_cancelled">Sleep timer cancelled</string>
+    <string name="shutdown_timer_set">Sleep timer set for %1$s</string>
+    <string name="accessibility_service_description">Allows sleep timer to turn off the screen when the timer expires.</string>
+    <string name="sleep_service_not_enabled">Please enable accessibility service for sleep timer to work</string>
 </resources>

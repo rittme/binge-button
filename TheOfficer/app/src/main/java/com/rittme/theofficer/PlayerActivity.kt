@@ -1,7 +1,11 @@
 package com.rittme.theofficer
 
+import android.content.Intent
+import android.content.res.ColorStateList
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.util.Log
 import android.view.KeyEvent
 import android.view.View
@@ -13,6 +17,7 @@ import android.widget.ListView
 import android.widget.TextView
 import android.widget.Toast
 import android.widget.ArrayAdapter
+import androidx.core.content.ContextCompat
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AlertDialog
@@ -66,12 +71,14 @@ class PlayerActivity : AppCompatActivity() {
     private var episodePickerSeasons: List<SeasonGroup> = emptyList()
     private var currentSeasonGroup: SeasonGroup? = null
     private var episodePickerSelectedIndex = 0
+    private var shutdownTimerButton: ImageButton? = null
 
     companion object {
         private const val TAG = "PlayerActivity"
         private const val AUTO_HIDE_DELAY_MS = 4000L
         private const val DIM_STEP = 0.1f
         private const val DIM_MAX = 0.9f
+        private const val TIMER_ACTIVE_COLOR = 0xFFFF9800.toInt() // Orange/amber color
     }
 
     private enum class EpisodePickerMode {
@@ -97,6 +104,7 @@ class PlayerActivity : AppCompatActivity() {
         setupDimOverlay()
         setupOpacityControls()
         setupEpisodePicker()
+        setupShutdownTimer()
         setupControllerVisibilityListener()
         setupViewModelObservers()
     }
@@ -157,7 +165,8 @@ class PlayerActivity : AppCompatActivity() {
         val bottomBarAppIds = listOf(
             R.id.exo_opacity_down,
             R.id.exo_opacity_up,
-            R.id.exo_episode_picker
+            R.id.exo_episode_picker,
+            R.id.exo_shutdown_timer
         )
 
         val allButtonIds = centerButtonIds + bottomBarMedia3Ids + bottomBarAppIds
@@ -246,6 +255,8 @@ class PlayerActivity : AppCompatActivity() {
                     Toast.makeText(this, getString(R.string.error_no_episodes), Toast.LENGTH_LONG).show()
                 }
             }
+
+            updateShutdownTimerIndicator(state.shutdownTimerRemainingMinutes)
         }
     }
 
@@ -403,6 +414,81 @@ class PlayerActivity : AppCompatActivity() {
 
         playerView.findViewById<ImageButton?>(R.id.exo_episode_picker)?.setOnClickListener {
             showSeasonMenu()
+        }
+    }
+
+    private fun setupShutdownTimer() {
+        shutdownTimerButton = playerView.findViewById(R.id.exo_shutdown_timer)
+        shutdownTimerButton?.setOnClickListener {
+            showShutdownTimerDialog()
+        }
+    }
+
+    private fun showShutdownTimerDialog() {
+        val timerOptions = arrayOf(
+            getString(R.string.shutdown_timer_off),
+            "5 minutes",
+            getString(R.string.shutdown_timer_15),
+            getString(R.string.shutdown_timer_30),
+            getString(R.string.shutdown_timer_45),
+            getString(R.string.shutdown_timer_60),
+            getString(R.string.shutdown_timer_120)
+        )
+        val timerValues = arrayOf(0, 5, 15, 30, 45, 60, 120)
+
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.shutdown_timer_title))
+            .setItems(timerOptions) { _, which ->
+                val selectedMinutes = timerValues[which]
+                if (selectedMinutes == 0) {
+                    viewModel.cancelShutdownTimer()
+                    Toast.makeText(this, getString(R.string.shutdown_timer_cancelled), Toast.LENGTH_SHORT).show()
+                } else {
+                    viewModel.startShutdownTimer(selectedMinutes) {
+                        executeDeviceSleep()
+                    }
+                    Toast.makeText(
+                        this,
+                        getString(R.string.shutdown_timer_set, timerOptions[which]),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+            .show()
+    }
+
+    private fun executeDeviceSleep() {
+        Log.d(TAG, "Executing device sleep")
+        exoPlayer?.pause()
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            if (SleepAccessibilityService.lockScreen()) {
+                Log.d(TAG, "Screen locked via accessibility service")
+            } else {
+                promptEnableAccessibilityService()
+            }
+        }
+    }
+
+    private fun promptEnableAccessibilityService() {
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.shutdown_timer))
+            .setMessage(getString(R.string.sleep_service_not_enabled))
+            .setPositiveButton("Open Settings") { _, _ ->
+                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun updateShutdownTimerIndicator(remainingMinutes: Int?) {
+        val button = shutdownTimerButton ?: return
+        if (remainingMinutes != null && remainingMinutes > 0) {
+            button.imageTintList = ColorStateList.valueOf(TIMER_ACTIVE_COLOR)
+            button.contentDescription = getString(R.string.shutdown_timer_active, remainingMinutes)
+        } else {
+            button.imageTintList = null
+            button.contentDescription = getString(R.string.shutdown_timer)
         }
     }
 

@@ -90,6 +90,12 @@
           style="@style/ExoStyledControls.Button.Bottom"
           android:contentDescription="@string/episode_picker"
           android:src="@android:drawable/ic_menu_agenda" />
+
+      <ImageButton
+          android:id="@id/exo_shutdown_timer"
+          style="@style/ExoStyledControls.Button.Bottom"
+          android:contentDescription="@string/shutdown_timer"
+          android:src="@drawable/ic_timer" />
       <!-- <ImageButton android:id="@id/exo_settings"
           style="@style/ExoStyledControls.Button.Bottom.Settings"/> -->
 
