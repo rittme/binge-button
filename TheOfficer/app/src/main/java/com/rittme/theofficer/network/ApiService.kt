@@ -14,27 +14,22 @@ import okhttp3.Interceptor
 import java.util.concurrent.TimeUnit
 
 interface ApiService {
-    // Adjust base URL to your server's IP and port
-    // For emulator, if server is on host machine: "http://192.168.1.42:4242/"
-    // For physical device on same network: "http://YOUR_SERVER_IP:8080/"
     companion object {
-        private const val BASE_URL = "http://YOUR_SERVER_IP:8080/"
-        private const val API_KEY = "your-secret-token" // Should match the backend API key
+        fun create(baseUrl: String, apiKey: String): ApiService {
+            val normalizedUrl = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
 
-        fun create(): ApiService {
-            val logger = HttpLoggingInterceptor().apply { 
-                level = HttpLoggingInterceptor.Level.BODY 
+            val logger = HttpLoggingInterceptor().apply {
+                level = HttpLoggingInterceptor.Level.BODY
             }
-            
-            // Add API key authentication interceptor
+
             val authInterceptor = Interceptor { chain ->
                 val originalRequest = chain.request()
                 val newRequest = originalRequest.newBuilder()
-                    .addHeader("Authorization", "Bearer $API_KEY")
+                    .addHeader("Authorization", "Bearer $apiKey")
                     .build()
                 chain.proceed(newRequest)
             }
-            
+
             val client = OkHttpClient.Builder()
                 .addInterceptor(logger)
                 .addInterceptor(authInterceptor)
@@ -44,7 +39,7 @@ interface ApiService {
                 .build()
 
             return Retrofit.Builder()
-                .baseUrl(BASE_URL)
+                .baseUrl(normalizedUrl)
                 .client(client)
                 .addConverterFactory(GsonConverterFactory.create())
                 .build()

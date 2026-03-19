@@ -34,4 +34,16 @@
     <string name="shutdown_timer_set">Sleep timer set for %1$s</string>
     <string name="accessibility_service_description">Allows sleep timer to turn off the screen when the timer expires.</string>
     <string name="sleep_service_not_enabled">Please enable accessibility service for sleep timer to work</string>
+    <string name="setup_title">Server Setup</string>
+    <string name="setup_subtitle">Enter your server address and password to connect.</string>
+    <string name="setup_url_label">Server address</string>
+    <string name="setup_url_hint">http://192.168.1.10:8080</string>
+    <string name="setup_password_label">Password</string>
+    <string name="setup_password_hint">your-password</string>
+    <string name="setup_connect">Connect</string>
+    <string name="setup_connecting">Connecting…</string>
+    <string name="setup_error_url_empty">Please enter a server address.</string>
+    <string name="setup_error_unreachable">Could not reach server. Check the address and try again.</string>
+    <string name="setup_error_auth">Authentication failed (code %1$d). Check your password.</string>
+    <string name="menu_server_settings">Server settings</string>
 </resources>
