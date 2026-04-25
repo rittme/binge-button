@@ -1,5 +1,6 @@
 package com.rittme.theofficer
 
+import android.content.Context
 import android.content.Intent
 import android.content.res.ColorStateList
 import android.net.Uri
@@ -54,7 +55,12 @@ class PlayerActivity : AppCompatActivity() {
     private var mediaSession: MediaSession? = null
     private var playlistEpisodeIds: List<String> = emptyList()
 
-    private val apiService by lazy { ApiService.create() }
+    private val apiService by lazy {
+        val prefs = getSharedPreferences(SetupActivity.PREFS_NAME, Context.MODE_PRIVATE)
+        val url = prefs.getString(SetupActivity.KEY_SERVER_URL, "") ?: ""
+        val key = prefs.getString(SetupActivity.KEY_API_KEY, "") ?: ""
+        ApiService.create(url, key)
+    }
     private val viewModel: PlayerViewModel by viewModels {
         PlayerViewModel.PlayerViewModelFactory(apiService)
     }
@@ -94,6 +100,14 @@ class PlayerActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        val prefs = getSharedPreferences(SetupActivity.PREFS_NAME, Context.MODE_PRIVATE)
+        if (prefs.getString(SetupActivity.KEY_SERVER_URL, "").isNullOrEmpty()) {
+            startActivity(Intent(this, SetupActivity::class.java))
+            finish()
+            return
+        }
+
         setContentView(R.layout.activity_player)
 
         playerView = findViewById(R.id.player_view)
@@ -481,6 +495,20 @@ class PlayerActivity : AppCompatActivity() {
             .show()
     }
 
+    private fun showPlayerOptionsDialog() {
+        AlertDialog.Builder(this)
+            .setItems(arrayOf(getString(R.string.menu_server_settings))) { _, which ->
+                if (which == 0) navigateToSetup()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun navigateToSetup() {
+        startActivity(Intent(this, SetupActivity::class.java))
+        finish()
+    }
+
     private fun updateShutdownTimerIndicator(remainingMinutes: Int?) {
         val button = shutdownTimerButton ?: return
         if (remainingMinutes != null && remainingMinutes > 0) {
@@ -654,14 +682,15 @@ class PlayerActivity : AppCompatActivity() {
                     return true
                 }
             }
-        } else if(!overlayVisible &&
+        } else if (!overlayVisible &&
             event.action == KeyEvent.ACTION_DOWN &&
-            event.keyCode == KeyEvent.KEYCODE_BACK){
+            event.keyCode == KeyEvent.KEYCODE_BACK) {
             @UnstableApi
-            if (playerView.isControllerFullyVisible ) {
+            if (playerView.isControllerFullyVisible) {
                 playerView.hideController()
                 return true
             } else {
+                showPlayerOptionsDialog()
                 return true
             }
         }
