@@ -34,4 +34,11 @@
     <string name="shutdown_timer_set">Sleep timer set for %1$s</string>
     <string name="accessibility_service_description">Allows sleep timer to turn off the screen when the timer expires.</string>
     <string name="sleep_service_not_enabled">Please enable accessibility service for sleep timer to work</string>
+    <string name="night_audio">Night audio</string>
+    <string name="night_audio_on">Night audio on</string>
+    <string name="night_audio_off">Night audio off</string>
+    <string name="night_audio_strength_title">Night audio strength</string>
+    <string name="night_audio_strength_mild">Mild — tames the loudest spikes only</string>
+    <string name="night_audio_strength_medium">Medium — balanced</string>
+    <string name="night_audio_strength_strong">Strong — maximum smoothing, quiet dialogue boosted</string>
 </resources>

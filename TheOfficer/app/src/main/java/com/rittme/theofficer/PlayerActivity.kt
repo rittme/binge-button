@@ -26,6 +26,8 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.isVisible
+import com.rittme.theofficer.audio.NightAudioController
+import com.rittme.theofficer.audio.NightAudioStrength
 import com.rittme.theofficer.network.ApiService
 import com.rittme.theofficer.ui.PlayerUiState
 import com.rittme.theofficer.ui.PlayerViewModel
@@ -72,6 +74,8 @@ class PlayerActivity : AppCompatActivity() {
     private var currentSeasonGroup: SeasonGroup? = null
     private var episodePickerSelectedIndex = 0
     private var shutdownTimerButton: ImageButton? = null
+    private var nightAudioButton: ImageButton? = null
+    private val nightAudio = NightAudioController()
 
     companion object {
         private const val TAG = "PlayerActivity"
@@ -79,6 +83,9 @@ class PlayerActivity : AppCompatActivity() {
         private const val DIM_STEP = 0.1f
         private const val DIM_MAX = 0.9f
         private const val TIMER_ACTIVE_COLOR = 0xFFFF9800.toInt() // Orange/amber color
+        private const val PREFS_NAME = "theofficer_prefs"
+        private const val KEY_NIGHT_AUDIO_ENABLED = "night_audio_enabled"
+        private const val KEY_NIGHT_AUDIO_STRENGTH = "night_audio_strength"
     }
 
     private enum class EpisodePickerMode {
@@ -105,6 +112,7 @@ class PlayerActivity : AppCompatActivity() {
         setupOpacityControls()
         setupEpisodePicker()
         setupShutdownTimer()
+        setupNightAudio()
         setupControllerVisibilityListener()
         setupViewModelObservers()
     }
@@ -134,6 +142,8 @@ class PlayerActivity : AppCompatActivity() {
 
                     // Add player event listener
                     player.addListener(playerListener)
+                    // Push initial audio session id; subsequent changes arrive via the listener.
+                    nightAudio.onAudioSessionId(player.audioSessionId)
                 }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize ExoPlayer", e)
@@ -166,7 +176,8 @@ class PlayerActivity : AppCompatActivity() {
             R.id.exo_opacity_down,
             R.id.exo_opacity_up,
             R.id.exo_episode_picker,
-            R.id.exo_shutdown_timer
+            R.id.exo_shutdown_timer,
+            R.id.exo_night_audio
         )
 
         val allButtonIds = centerButtonIds + bottomBarMedia3Ids + bottomBarAppIds
@@ -221,6 +232,10 @@ class PlayerActivity : AppCompatActivity() {
             if (index != C.INDEX_UNSET && index in episodes.indices) {
                 viewModel.syncToEpisodeIndex(index)
             }
+        }
+
+        override fun onAudioSessionIdChanged(audioSessionId: Int) {
+            nightAudio.onAudioSessionId(audioSessionId)
         }
     }
 
@@ -422,6 +437,78 @@ class PlayerActivity : AppCompatActivity() {
         shutdownTimerButton?.setOnClickListener {
             showShutdownTimerDialog()
         }
+    }
+
+    private fun setupNightAudio() {
+        val button = playerView.findViewById<ImageButton?>(R.id.exo_night_audio) ?: return
+        nightAudioButton = button
+
+        if (!nightAudio.isSupported) {
+            button.visibility = View.GONE
+            return
+        }
+
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        val initialEnabled = prefs.getBoolean(KEY_NIGHT_AUDIO_ENABLED, false)
+        val initialStrength =
+            NightAudioStrength.fromName(prefs.getString(KEY_NIGHT_AUDIO_STRENGTH, null))
+
+        nightAudio.setStrength(initialStrength)
+        nightAudio.setEnabled(initialEnabled)
+        updateNightAudioIndicator(initialEnabled)
+
+        button.setOnClickListener {
+            val newEnabled = !getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                .getBoolean(KEY_NIGHT_AUDIO_ENABLED, false)
+            getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit()
+                .putBoolean(KEY_NIGHT_AUDIO_ENABLED, newEnabled)
+                .apply()
+            nightAudio.setEnabled(newEnabled)
+            updateNightAudioIndicator(newEnabled)
+            val msgRes = if (newEnabled) R.string.night_audio_on else R.string.night_audio_off
+            Toast.makeText(this, getString(msgRes), Toast.LENGTH_SHORT).show()
+        }
+
+        button.setOnLongClickListener {
+            showNightAudioStrengthDialog()
+            true
+        }
+    }
+
+    private fun updateNightAudioIndicator(enabled: Boolean) {
+        val button = nightAudioButton ?: return
+        button.imageTintList = if (enabled) {
+            ColorStateList.valueOf(TIMER_ACTIVE_COLOR)
+        } else {
+            null
+        }
+    }
+
+    private fun showNightAudioStrengthDialog() {
+        val options = arrayOf(
+            getString(R.string.night_audio_strength_mild),
+            getString(R.string.night_audio_strength_medium),
+            getString(R.string.night_audio_strength_strong)
+        )
+        val values = arrayOf(
+            NightAudioStrength.MILD,
+            NightAudioStrength.MEDIUM,
+            NightAudioStrength.STRONG
+        )
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        val current = NightAudioStrength.fromName(prefs.getString(KEY_NIGHT_AUDIO_STRENGTH, null))
+        val checkedIndex = values.indexOf(current).coerceAtLeast(0)
+
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.night_audio_strength_title))
+            .setSingleChoiceItems(options, checkedIndex) { dialog, which ->
+                val chosen = values[which]
+                prefs.edit().putString(KEY_NIGHT_AUDIO_STRENGTH, chosen.name).apply()
+                nightAudio.setStrength(chosen)
+                dialog.dismiss()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun showShutdownTimerDialog() {
@@ -759,6 +846,7 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun releasePlayer() {
+        nightAudio.release()
         exoPlayer?.let { player ->
             try {
                 player.stop()
