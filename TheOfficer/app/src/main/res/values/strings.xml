@@ -47,4 +47,11 @@
     <string name="setup_error_unreachable">Could not reach server. Check the address and try again.</string>
     <string name="setup_error_auth">Authentication failed (code %1$d). Check your password.</string>
     <string name="menu_server_settings">Server settings</string>
+    <string name="night_audio">Night audio</string>
+    <string name="night_audio_on">Night audio on</string>
+    <string name="night_audio_off">Night audio off</string>
+    <string name="night_audio_strength_title">Night audio strength</string>
+    <string name="night_audio_strength_mild">Mild — tames the loudest spikes only</string>
+    <string name="night_audio_strength_medium">Medium — balanced</string>
+    <string name="night_audio_strength_strong">Strong — maximum smoothing, quiet dialogue boosted</string>
 </resources>
