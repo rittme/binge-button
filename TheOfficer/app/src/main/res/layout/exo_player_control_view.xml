@@ -96,6 +96,12 @@
           style="@style/ExoStyledControls.Button.Bottom"
           android:contentDescription="@string/shutdown_timer"
           android:src="@drawable/ic_timer" />
+
+      <ImageButton
+          android:id="@id/exo_night_audio"
+          style="@style/ExoStyledControls.Button.Bottom"
+          android:contentDescription="@string/night_audio"
+          android:src="@drawable/ic_night_audio" />
       <!-- <ImageButton android:id="@id/exo_settings"
           style="@style/ExoStyledControls.Button.Bottom.Settings"/> -->
 
