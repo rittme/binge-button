@@ -2,10 +2,14 @@ package models
 
 // EpisodeInfo represents a single episode's information
 type EpisodeInfo struct {
-	ID          string `json:"id"`          // e.g., "Show_S01E01"
-	Title       string `json:"title"`       // Optional: "The First Episode"
-	VideoURL    string `json:"videoUrl"`
-	SubtitleURL string `json:"subtitleUrl"` // URL for the .srt or .vtt file
+	ID           string `json:"id"`          // e.g., "Show_S01E01"
+	Title        string `json:"title"`       // Optional: "The First Episode"
+	VideoURL     string `json:"videoUrl"`
+	SubtitleURL  string `json:"subtitleUrl"` // URL for the .srt or .vtt file
+	IntroStartMs *int64 `json:"introStartMs,omitempty"`
+	IntroEndMs   *int64 `json:"introEndMs,omitempty"`
+	OutroStartMs *int64 `json:"outroStartMs,omitempty"`
+	OutroEndMs   *int64 `json:"outroEndMs,omitempty"`
 }
 
 // ShowInfoResponse represents the overall show information and current state

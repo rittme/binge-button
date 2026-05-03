@@ -5,7 +5,11 @@ data class EpisodeInfo(
     val id: String, // e.g., "Show_S01E01"
     val title: String?, // Optional: "The First Episode"
     val videoUrl: String,
-    val subtitleUrl: String? // URL for the .srt or .vtt file
+    val subtitleUrl: String?, // URL for the .srt or .vtt file
+    val introStartMs: Long? = null,
+    val introEndMs: Long? = null,
+    val outroStartMs: Long? = null,
+    val outroEndMs: Long? = null
 )
 
 // Represents the overall show information and current state

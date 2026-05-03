@@ -6,7 +6,6 @@ import android.content.res.ColorStateList
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.provider.Settings
 import android.util.Log
 import android.view.KeyEvent
 import android.view.View
@@ -27,6 +26,10 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.isVisible
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import com.rittme.theofficer.network.ApiService
 import com.rittme.theofficer.ui.PlayerUiState
 import com.rittme.theofficer.ui.PlayerViewModel
@@ -79,12 +82,26 @@ class PlayerActivity : AppCompatActivity() {
     private var episodePickerSelectedIndex = 0
     private var shutdownTimerButton: ImageButton? = null
 
+    private var shutdownActive = false
+    private var shutdownFadeJob: Job? = null
+    private var lastShutdownTimerMinutes: Int? = null
+    private var preFadeVolume: Float? = null
+    private var preFadeBrightness: Float? = null
+
+    private var autoSkipJob: Job? = null
+    private var skippedIntroForEpisode: String? = null
+    private var skippedOutroForEpisode: String? = null
+
     companion object {
         private const val TAG = "PlayerActivity"
         private const val AUTO_HIDE_DELAY_MS = 4000L
         private const val DIM_STEP = 0.1f
         private const val DIM_MAX = 0.9f
         private const val TIMER_ACTIVE_COLOR = 0xFFFF9800.toInt() // Orange/amber color
+        private const val SHUTDOWN_FADE_DURATION_MS = 60_000L
+        private const val SHUTDOWN_FADE_TICK_MS = 250L
+        private const val SHUTDOWN_MIN_BRIGHTNESS = 0.01f
+        private const val AUTO_SKIP_TICK_MS = 500L
     }
 
     private enum class EpisodePickerMode {
@@ -218,9 +235,11 @@ class PlayerActivity : AppCompatActivity() {
             if (isPlaying) {
                 setPreventAmbientMode(true)
                 viewModel.startProgressUpdates { exoPlayer?.currentPosition ?: 0L }
+                startAutoSkipLoop()
             } else {
                 setPreventAmbientMode(false)
                 viewModel.stopProgressUpdates()
+                stopAutoSkipLoop()
             }
         }
 
@@ -235,6 +254,9 @@ class PlayerActivity : AppCompatActivity() {
             if (index != C.INDEX_UNSET && index in episodes.indices) {
                 viewModel.syncToEpisodeIndex(index)
             }
+            // New episode - re-arm auto-skip.
+            skippedIntroForEpisode = null
+            skippedOutroForEpisode = null
         }
     }
 
@@ -456,10 +478,15 @@ class PlayerActivity : AppCompatActivity() {
                 val selectedMinutes = timerValues[which]
                 if (selectedMinutes == 0) {
                     viewModel.cancelShutdownTimer()
+                    cancelShutdownFadeOut()
+                    lastShutdownTimerMinutes = null
+                    shutdownActive = false
+                    restoreSystemBrightness()
                     Toast.makeText(this, getString(R.string.shutdown_timer_cancelled), Toast.LENGTH_SHORT).show()
                 } else {
+                    lastShutdownTimerMinutes = selectedMinutes
                     viewModel.startShutdownTimer(selectedMinutes) {
-                        executeDeviceSleep()
+                        startShutdownFadeOut()
                     }
                     Toast.makeText(
                         this,
@@ -471,28 +498,107 @@ class PlayerActivity : AppCompatActivity() {
             .show()
     }
 
+    private fun startShutdownFadeOut() {
+        if (shutdownFadeJob?.isActive == true) return
+        Log.d(TAG, "Starting shutdown fade-out over ${SHUTDOWN_FADE_DURATION_MS}ms")
+
+        preFadeVolume = exoPlayer?.volume
+        preFadeBrightness = window.attributes.screenBrightness
+
+        val startVolume = preFadeVolume ?: 1f
+        val startBrightness = preFadeBrightness?.takeIf { it in 0f..1f } ?: 1f
+        val startDim = dimAlpha
+
+        shutdownFadeJob = lifecycleScope.launch {
+            val startTime = System.currentTimeMillis()
+            while (true) {
+                val elapsed = System.currentTimeMillis() - startTime
+                val progress = (elapsed.toFloat() / SHUTDOWN_FADE_DURATION_MS).coerceIn(0f, 1f)
+
+                exoPlayer?.volume = startVolume * (1f - progress)
+                dimOverlayView?.alpha = startDim + (1f - startDim) * progress
+                val newBrightness = startBrightness + (SHUTDOWN_MIN_BRIGHTNESS - startBrightness) * progress
+                window.attributes = window.attributes.apply {
+                    screenBrightness = newBrightness
+                }
+
+                if (progress >= 1f) break
+                delay(SHUTDOWN_FADE_TICK_MS)
+            }
+            Log.d(TAG, "Fade-out complete; entering hard sleep")
+            executeDeviceSleep()
+        }
+    }
+
+    private fun cancelShutdownFadeOut(): Boolean {
+        val job = shutdownFadeJob ?: return false
+        if (!job.isActive) return false
+        Log.d(TAG, "Cancelling shutdown fade-out")
+        job.cancel()
+        shutdownFadeJob = null
+
+        exoPlayer?.volume = preFadeVolume ?: 1f
+        preFadeVolume = null
+        dimOverlayView?.alpha = dimAlpha
+        restoreSystemBrightness()
+        return true
+    }
+
+    private fun handleShutdownFadeInterrupt(): Boolean {
+        if (!cancelShutdownFadeOut()) return false
+        val minutes = lastShutdownTimerMinutes
+        if (minutes != null && minutes > 0) {
+            viewModel.startShutdownTimer(minutes) {
+                startShutdownFadeOut()
+            }
+        }
+        Toast.makeText(this, getString(R.string.shutdown_canceled), Toast.LENGTH_SHORT).show()
+        return true
+    }
+
+    override fun onUserInteraction() {
+        super.onUserInteraction()
+        if (shutdownFadeJob?.isActive == true) {
+            handleShutdownFadeInterrupt()
+        }
+    }
+
+    private fun restoreSystemBrightness() {
+        window.attributes = window.attributes.apply {
+            screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+        }
+        preFadeBrightness = null
+    }
+
     private fun executeDeviceSleep() {
         Log.d(TAG, "Executing device sleep")
-        exoPlayer?.pause()
+        shutdownActive = true
+
+        try {
+            exoPlayer?.stop()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error stopping player", e)
+        }
+        playerView.player = null
+        releasePlayer()
+
+        mediaSession?.release()
+        mediaSession = null
+
+        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        window.attributes = window.attributes.apply {
+            screenBrightness = SHUTDOWN_MIN_BRIGHTNESS
+        }
+        dimOverlayView?.alpha = 1.0f
+        hideSystemUi()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             if (SleepAccessibilityService.lockScreen()) {
                 Log.d(TAG, "Screen locked via accessibility service")
             } else {
-                promptEnableAccessibilityService()
+                Log.w(TAG, "Accessibility service not bound; relying on dark-screen fallback")
             }
         }
-    }
-
-    private fun promptEnableAccessibilityService() {
-        AlertDialog.Builder(this)
-            .setTitle(getString(R.string.shutdown_timer))
-            .setMessage(getString(R.string.sleep_service_not_enabled))
-            .setPositiveButton("Open Settings") { _, _ ->
-                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
     }
 
     private fun showPlayerOptionsDialog() {
@@ -652,6 +758,9 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.action == KeyEvent.ACTION_DOWN && shutdownFadeJob?.isActive == true) {
+            if (handleShutdownFadeInterrupt()) return true
+        }
         val overlayVisible = episodePickerOverlay?.visibility == View.VISIBLE
         if (overlayVisible && event.action == KeyEvent.ACTION_DOWN) {
             when (event.keyCode) {
@@ -735,6 +844,7 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun setPreventAmbientMode(enabled: Boolean) {
         if (enabled) {
+            if (shutdownActive) return
             window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         } else {
             window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -782,9 +892,54 @@ class PlayerActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        stopAutoSkipLoop()
         releasePlayer()
         mediaSession?.release()
         mediaSession = null
+    }
+
+    private fun startAutoSkipLoop() {
+        if (autoSkipJob?.isActive == true) return
+        autoSkipJob = lifecycleScope.launch {
+            while (true) {
+                checkAutoSkip()
+                delay(AUTO_SKIP_TICK_MS)
+            }
+        }
+    }
+
+    private fun stopAutoSkipLoop() {
+        autoSkipJob?.cancel()
+        autoSkipJob = null
+    }
+
+    private fun checkAutoSkip() {
+        val player = exoPlayer ?: return
+        val episode = viewModel.uiState.value?.currentEpisode ?: return
+        val position = player.currentPosition
+
+        val introStart = episode.introStartMs
+        val introEnd = episode.introEndMs
+        if (introStart != null && introEnd != null && introEnd > introStart &&
+            skippedIntroForEpisode != episode.id &&
+            position in introStart..(introEnd - 1000L)
+        ) {
+            Log.d(TAG, "Auto-skipping intro on ${episode.id}: $position -> $introEnd")
+            skippedIntroForEpisode = episode.id
+            player.seekTo(introEnd)
+            return
+        }
+
+        val outroStart = episode.outroStartMs
+        val outroEnd = episode.outroEndMs
+        if (outroStart != null && outroEnd != null && outroEnd > outroStart &&
+            skippedOutroForEpisode != episode.id &&
+            position in outroStart..(outroEnd - 1000L)
+        ) {
+            Log.d(TAG, "Auto-skipping outro on ${episode.id}: $position -> $outroEnd")
+            skippedOutroForEpisode = episode.id
+            player.seekTo(outroEnd)
+        }
     }
 
     private fun releasePlayer() {
