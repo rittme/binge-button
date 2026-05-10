@@ -48,7 +48,6 @@ import androidx.media3.session.MediaSession
 import androidx.media3.ui.PlayerView
 import com.rittme.theofficer.data.EpisodeInfo
 import java.io.File
-import kotlin.math.abs
 
 
 class PlayerActivity : AppCompatActivity() {
@@ -342,12 +341,6 @@ class PlayerActivity : AppCompatActivity() {
         if (currentIndex != desiredIndex) {
             exoPlayer?.seekTo(desiredIndex, state.startPositionMs)
             exoPlayer?.play()
-            return
-        }
-
-        val currentPosition = exoPlayer?.currentPosition ?: 0L
-        if (state.startPositionMs > 0 && abs(currentPosition - state.startPositionMs) > 1000L) {
-            exoPlayer?.seekTo(state.startPositionMs)
         }
     }
 
