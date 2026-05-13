@@ -31,6 +31,7 @@
     <string name="shutdown_timer_120">2 hours</string>
     <string name="shutdown_timer_active">Sleep in %1$d min</string>
     <string name="shutdown_timer_cancelled">Sleep timer cancelled</string>
+    <string name="shutdown_timer_sticky_reminder">Sleep timer: %1$d min (from last session)</string>
     <string name="shutdown_timer_set">Sleep timer set for %1$s</string>
     <string name="shutdown_canceled">Sleep canceled — timer reset</string>
     <string name="accessibility_service_description">Allows sleep timer to turn off the screen when the timer expires.</string>
