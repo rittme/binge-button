@@ -108,6 +108,7 @@ class PlayerActivity : AppCompatActivity() {
         private const val PREFS_NAME = "theofficer_prefs"
         private const val KEY_NIGHT_AUDIO_ENABLED = "night_audio_enabled"
         private const val KEY_NIGHT_AUDIO_STRENGTH = "night_audio_strength"
+        private const val KEY_SLEEP_TIMER_MINUTES = "sleep_timer_minutes"
     }
 
     private enum class EpisodePickerMode {
@@ -145,6 +146,7 @@ class PlayerActivity : AppCompatActivity() {
         setupNightAudio()
         setupControllerVisibilityListener()
         setupViewModelObservers()
+        loadStickyTimerIfAny()
     }
 
     @androidx.annotation.OptIn(UnstableApi::class)
@@ -468,6 +470,20 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
+    private fun loadStickyTimerIfAny() {
+        val savedMinutes = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            .getInt(KEY_SLEEP_TIMER_MINUTES, 0)
+        if (savedMinutes > 0) {
+            lastShutdownTimerMinutes = savedMinutes
+            viewModel.startShutdownTimer(savedMinutes) { startShutdownFadeOut() }
+            Toast.makeText(
+                this,
+                getString(R.string.shutdown_timer_sticky_reminder, savedMinutes),
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
     private fun setupNightAudio() {
         val button = playerView.findViewById<ImageButton?>(R.id.exo_night_audio) ?: return
         nightAudioButton = button
@@ -556,15 +572,18 @@ class PlayerActivity : AppCompatActivity() {
             .setTitle(getString(R.string.shutdown_timer_title))
             .setItems(timerOptions) { _, which ->
                 val selectedMinutes = timerValues[which]
+                val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
                 if (selectedMinutes == 0) {
                     viewModel.cancelShutdownTimer()
                     cancelShutdownFadeOut()
                     lastShutdownTimerMinutes = null
                     shutdownActive = false
                     restoreSystemBrightness()
+                    prefs.edit().remove(KEY_SLEEP_TIMER_MINUTES).apply()
                     Toast.makeText(this, getString(R.string.shutdown_timer_cancelled), Toast.LENGTH_SHORT).show()
                 } else {
                     lastShutdownTimerMinutes = selectedMinutes
+                    prefs.edit().putInt(KEY_SLEEP_TIMER_MINUTES, selectedMinutes).apply()
                     viewModel.startShutdownTimer(selectedMinutes) {
                         startShutdownFadeOut()
                     }
