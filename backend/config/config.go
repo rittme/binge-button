@@ -15,6 +15,8 @@ type Config struct {
 	APIKey            string
 	VideoFilePattern  string
 	SubtitleFilePattern string
+	SettingsFile      string
+	RemoteCertDir     string
 }
 
 // LoadConfig loads the configuration from environment variables or defaults
@@ -26,6 +28,8 @@ func LoadConfig() *Config {
 	defaultMediaDir := filepath.Join(filepath.Dir(cwd), "media")
 	defaultSeasonsDir := filepath.Join(defaultMediaDir, "shows")
 	defaultStateFile := filepath.Join(cwd, "data", "state.json")
+	defaultSettingsFile := filepath.Join(cwd, "data", "settings.json")
+	defaultRemoteCertDir := filepath.Join(cwd, "data", "atvremote")
 	
 	config := &Config{
 		Port:              getEnv("PORT", "8080"),
@@ -35,6 +39,8 @@ func LoadConfig() *Config {
 		APIKey:            getEnv("API_KEY", "your-secret-token"),
 		VideoFilePattern:  getEnv("VIDEO_FILE_PATTERN", "*.mp4,*.mkv,*.avi"),
 		SubtitleFilePattern: getEnv("SUBTITLE_FILE_PATTERN", "*.srt,*.vtt"),
+		SettingsFile:      getEnv("SETTINGS_FILE", defaultSettingsFile),
+		RemoteCertDir:     getEnv("REMOTE_CERT_DIR", defaultRemoteCertDir),
 	}
 
 	log.Printf("%+v\n", config)

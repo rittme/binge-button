@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Comfort Player Settings</title>
+<style>
+  :root {
+    --bg: #f6f5f2;
+    --card: #ffffff;
+    --text: #1d1d1f;
+    --muted: #6e6e73;
+    --border: #e3e1dc;
+    --accent: #2f6f4e;
+    --accent-text: #ffffff;
+    --ok-bg: #e3f2e8;
+    --ok-text: #1e6a3c;
+    --err: #b3261e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141414;
+      --card: #1f1f1f;
+      --text: #f2f2f2;
+      --muted: #a0a0a5;
+      --border: #333333;
+      --accent: #5fb487;
+      --accent-text: #0f1f16;
+      --ok-bg: #1d3a28;
+      --ok-text: #8fd6ab;
+      --err: #ff8a80;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  h2 { font-size: 17px; margin: 32px 0 4px; }
+  .hint { color: var(--muted); margin: 0 0 16px; }
+  .device {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 16px;
+    align-items: center;
+  }
+  .info { flex: 1 1 260px; min-width: 0; }
+  .name { font-weight: 600; overflow-wrap: anywhere; }
+  .meta { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+  .meta code { font-size: 12px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; }
+  label.projector { display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 14px; cursor: pointer; flex-basis: 100%; }
+  button {
+    font: inherit;
+    border-radius: 8px;
+    padding: 7px 14px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    cursor: pointer;
+  }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+  button:disabled { opacity: .55; cursor: default; }
+  .badge {
+    background: var(--ok-bg);
+    color: var(--ok-text);
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .pair-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; flex-basis: 100%; }
+  .pair-form p { margin: 0; flex-basis: 100%; }
+  .pair-form input {
+    font: 600 18px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: .2em;
+    text-transform: uppercase;
+    width: 9.5em;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+  }
+  .msg { font-size: 13px; flex-basis: 100%; }
+  .msg.error { color: var(--err); }
+  .empty { color: var(--muted); padding: 24px; text-align: center; border: 1px dashed var(--border); border-radius: 12px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Comfort Player</h1>
+  <p class="hint">Server settings</p>
+
+  <h2>TVs &amp; projectors</h2>
+  <p class="hint">Devices that have played from this server. Pair one so the server can turn it off when the sleep timer ends.</p>
+  <div id="devices"><div class="empty">Loading…</div></div>
+</main>
+
+<script>
+(function () {
+  const list = document.getElementById('devices');
+  const openForms = new Set(); // device IDs whose code input is showing
+
+  function el(tag, attrs, children) {
+    const node = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs || {})) {
+      if (k === 'class') node.className = v;
+      else if (k === 'text') node.textContent = v;
+      else if (k.startsWith('on')) node.addEventListener(k.slice(2), v);
+      else node.setAttribute(k, v);
+    }
+    for (const c of children || []) if (c) node.append(c);
+    return node;
+  }
+
+  async function api(method, path, body) {
+    const res = await fetch(path, {
+      method,
+      headers: body ? { 'Content-Type': 'application/json' } : {},
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    let data = {};
+    try { data = await res.json(); } catch (_) {}
+    if (!res.ok) {
+      const err = new Error(data.error || ('Request failed (' + res.status + ')'));
+      err.status = res.status;
+      throw err;
+    }
+    return data;
+  }
+
+  const devicePath = (id) => '/api/settings/devices/' + encodeURIComponent(id);
+
+  function ago(unix) {
+    if (!unix) return 'never';
+    const s = Math.max(0, Math.floor(Date.now() / 1000 - unix));
+    if (s < 60) return 'just now';
+    if (s < 3600) return Math.floor(s / 60) + ' min ago';
+    if (s < 86400) return Math.floor(s / 3600) + ' h ago';
+    return Math.floor(s / 86400) + ' d ago';
+  }
+
+  async function load() {
+    try {
+      const { devices } = await api('GET', '/api/settings/devices');
+      render(devices || []);
+    } catch (e) {
+      list.replaceChildren(el('div', { class: 'empty', text: 'Could not load devices: ' + e.message }));
+    }
+  }
+
+  function render(devices) {
+    if (!devices.length) {
+      list.replaceChildren(el('div', { class: 'empty', text: 'No devices yet. Open TheOfficer on your TV and it will show up here.' }));
+      return;
+    }
+    list.replaceChildren(...devices.map(renderDevice));
+  }
+
+  function renderDevice(d) {
+    const msg = el('div', { class: 'msg' });
+    const setMsg = (text, isError) => { msg.textContent = text || ''; msg.className = 'msg' + (isError ? ' error' : ''); };
+
+    const meta = ['IP ' + d.ip];
+    if (d.mac) meta.push('MAC ' + d.mac);
+    meta.push('last seen ' + ago(d.lastSeen));
+
+    const info = el('div', { class: 'info' }, [
+      el('div', { class: 'name', text: d.name || 'Unknown device' }),
+      el('div', { class: 'meta', text: meta.join(' · ') }),
+    ]);
+
+    const actions = el('div', { class: 'actions' });
+    const row = el('div', { class: 'device' }, [info, actions]);
+
+    if (d.paired) {
+      const offBtn = el('button', { text: 'Turn off', onclick: async () => {
+        offBtn.disabled = true;
+        setMsg('Sending…');
+        try {
+          const r = await api('POST', devicePath(d.id) + '/power-off');
+          setMsg(r.result === 'already_off' ? 'Already off.' : 'Turned off.');
+        } catch (e) {
+          setMsg(e.message, true);
+          if (e.status === 409) load(); // TV forgot the pairing
+        } finally {
+          offBtn.disabled = false;
+        }
+      }});
+      actions.append(el('span', { class: 'badge', text: 'Paired' }), offBtn);
+    } else {
+      const pairBtn = el('button', { class: 'primary', text: 'Pair' });
+      const form = renderPairForm(d, setMsg, () => { openForms.delete(d.id); form.hidden = true; pairBtn.hidden = false; });
+      form.hidden = !openForms.has(d.id);
+      pairBtn.hidden = openForms.has(d.id);
+      pairBtn.addEventListener('click', async () => {
+        pairBtn.disabled = true;
+        pairBtn.textContent = 'Connecting…';
+        setMsg('');
+        try {
+          await api('POST', devicePath(d.id) + '/pair/start');
+          openForms.add(d.id);
+          pairBtn.hidden = true;
+          form.hidden = false;
+          form.querySelector('input').focus();
+        } catch (e) {
+          setMsg(e.message, true);
+        } finally {
+          pairBtn.disabled = false;
+          pairBtn.textContent = 'Pair';
+        }
+      });
+      actions.append(pairBtn);
+      row.append(form);
+    }
+
+    const checkbox = el('input', { type: 'checkbox' });
+    checkbox.checked = !!d.isProjector;
+    checkbox.addEventListener('change', async () => {
+      const wanted = checkbox.checked;
+      checkbox.disabled = true;
+      try {
+        await api('POST', devicePath(d.id), { isProjector: wanted });
+        d.isProjector = wanted;
+      } catch (e) {
+        checkbox.checked = !wanted;
+        setMsg('Could not save: ' + e.message, true);
+      } finally {
+        checkbox.disabled = false;
+      }
+    });
+    row.append(el('label', { class: 'projector' }, [checkbox, "It's a projector (press power twice to turn off)"]));
+    row.append(msg);
+    return row;
+  }
+
+  function renderPairForm(d, setMsg, close) {
+    const input = el('input', { maxlength: '6', autocomplete: 'off', spellcheck: 'false', placeholder: 'ABC123', 'aria-label': 'Pairing code' });
+    const submit = el('button', { class: 'primary', type: 'submit', text: 'Submit' });
+    const cancel = el('button', { type: 'button', text: 'Cancel', onclick: () => { setMsg(''); close(); } });
+    const form = el('form', { class: 'pair-form' }, [
+      el('p', { text: 'Enter the code shown on the TV' }),
+      input, submit, cancel,
+    ]);
+    form.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const code = input.value.trim();
+      if (code.length !== 6) { setMsg('The code has 6 characters.', true); return; }
+      submit.disabled = true;
+      setMsg('Pairing…');
+      try {
+        await api('POST', devicePath(d.id) + '/pair/finish', { code });
+        openForms.delete(d.id);
+        await load();
+      } catch (e) {
+        if (e.status === 400) {
+          setMsg('Wrong code, try again.', true);
+          input.select();
+        } else {
+          setMsg(e.message, true);
+          close();
+        }
+      } finally {
+        submit.disabled = false;
+      }
+    });
+    return form;
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>

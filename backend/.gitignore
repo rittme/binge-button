@@ -1,2 +1,3 @@
 comfort-player-backend
-data/*
+data/*data/settings.json*
+data/atvremote/

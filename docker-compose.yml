@@ -10,6 +10,8 @@ services:
       - MEDIA_DIR=/app/media
       - SEASONS_DIR=/app/media/shows
       - STATE_FILE=/app/data/state.json
+      - SETTINGS_FILE=/app/data/settings.json
+      - REMOTE_CERT_DIR=/app/data/atvremote
       - API_KEY=${API_KEY:-your-secret-token}
       - VIDEO_FILE_PATTERN=*.mp4,*.mkv,*.avi
       - SUBTITLE_FILE_PATTERN=*.srt,*.vtt
