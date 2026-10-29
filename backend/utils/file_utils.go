@@ -100,3 +100,35 @@ func CopyFile(src, dst string) error {
 	_, err = io.Copy(destFile, sourceFile)
 	return err
 }
+
+// WriteJSONAtomic writes data to a JSON file via a temp file + rename,
+// so a crash mid-write never leaves a truncated file behind.
+func WriteJSONAtomic(path string, v interface{}) error {
+	if err := EnsureDir(filepath.Dir(path)); err != nil {
+		return err
+	}
+
+	tmp := path + ".tmp"
+	file, err := os.OpenFile(tmp, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+	if err != nil {
+		return err
+	}
+
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(v); err != nil {
+		file.Close()
+		os.Remove(tmp)
+		return err
+	}
+	if err := file.Sync(); err != nil {
+		file.Close()
+		os.Remove(tmp)
+		return err
+	}
+	if err := file.Close(); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	return os.Rename(tmp, path)
+}

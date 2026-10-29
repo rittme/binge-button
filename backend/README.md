@@ -73,6 +73,8 @@ The server can be configured using environment variables:
 - `API_KEY` - API key for authentication (default: your-secret-token)
 - `VIDEO_FILE_PATTERN` - Pattern for video files (default: *.mp4,*.mkv,*.avi)
 - `SUBTITLE_FILE_PATTERN` - Pattern for subtitle files (default: *.srt,*.vtt)
+- `SETTINGS_FILE` - File storing server settings such as known devices (default: ./data/settings.json)
+- `REMOTE_CERT_DIR` - Directory for the TV-remote client certificate (default: ./data/atvremote)
 
 ## Directory Structure
 
@@ -93,7 +95,7 @@ media/
 
 ## Installation
 
-1. Install Go 1.21 or later
+1. Install Go 1.25 or later
 2. Install dependencies:
    ```
    go mod tidy
@@ -124,3 +126,28 @@ Authorization: Bearer your-secret-token
 ## State Persistence
 
 The server stores the current episode and playback time in a JSON file at `data/state.json`. This file is automatically created and updated as needed.
+
+## Settings Page & TV Power-Off
+
+Open `http://<server>:8080/settings` in a browser.
+
+The page lists every device that has called `/api/show/*`. If a device is an Android TV, its name and MAC address are read from its remote service, so it keeps its settings when its IP changes.
+
+- **Pair** pairs the server with a device: the TV shows a 6-character code, and you type it into the page. Once paired, the server can act as a network remote for that TV, using the Android TV Remote protocol v2 via [atvremote](https://github.com/jkiddo/atvremote).
+- **It's a projector** makes power-off press POWER twice, 200 ms apart, because projectors ask for confirmation.
+- **Turn off** sends the power-off to the device right away. It does nothing if the device is already off.
+
+Endpoints:
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/settings/devices` | List known devices |
+| POST | `/api/settings/devices/{id}` | Update a device, e.g. `{"isProjector": true}` |
+| POST | `/api/settings/devices/{id}/pair/start` | Start pairing (TV shows a code) |
+| POST | `/api/settings/devices/{id}/pair/finish` | `{"code": "ABC123"}` |
+| POST | `/api/settings/devices/{id}/power-off` | Turn a device off |
+| POST | `/api/remote/power-off` | Turn off the device making the request |
+
+Network requirement: the server must reach the TV on TCP ports **6466** and **6467**. Docker's default bridge network is fine for this.
+
+Settings are stored in `data/settings.json`, with one section per feature (for example `devices`). The client certificate lives in `data/atvremote/`. Both are git-ignored, and the certificate holds a private key.
