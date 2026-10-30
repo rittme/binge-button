@@ -68,6 +68,7 @@ func main() {
 	r.HandleFunc("/settings", settingsHandler.SettingsPage).Methods("GET")
 	r.HandleFunc("/api/settings/devices", settingsHandler.ListDevices).Methods("GET")
 	r.HandleFunc("/api/settings/devices/{id}", settingsHandler.UpdateDevice).Methods("POST")
+	r.HandleFunc("/api/settings/devices/{id}", settingsHandler.DeleteDevice).Methods("DELETE")
 	r.HandleFunc("/api/settings/devices/{id}/pair/start", settingsHandler.StartPairing).Methods("POST")
 	r.HandleFunc("/api/settings/devices/{id}/pair/finish", settingsHandler.FinishPairing).Methods("POST")
 	r.HandleFunc("/api/settings/devices/{id}/power-off", settingsHandler.PowerOffDevice).Methods("POST")

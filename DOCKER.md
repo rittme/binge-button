@@ -40,20 +40,46 @@ docker run -d \
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PORT` | 8080 | Server port |
+| `PORT` | 8080 | HTTP port for the whole server: API, streaming and the settings page |
 | `API_KEY` | your-secret-token | API authentication key |
 | `MEDIA_DIR` | /app/media | Media directory path |
 | `SEASONS_DIR` | /app/media/shows | Seasons directory path |
 | `STATE_FILE` | /app/data/state.json | State file location |
 | `VIDEO_FILE_PATTERN` | *.mp4,*.mkv,*.avi | Video file extensions |
 | `SUBTITLE_FILE_PATTERN` | *.srt,*.vtt | Subtitle file extensions |
+| `SETTINGS_FILE` | /app/data/settings.json | Server settings (known devices, pairing state) |
+| `REMOTE_CERT_DIR` | /app/data/atvremote | TV-remote client certificate and key |
+
+**Changing the port:** set `PORT`, for example in `.env` (`PORT=9090`) or with `PORT=9090 docker compose up -d`. The port mapping and both healthchecks follow it automatically.
+
+### Host networking (recommended on Linux for TV power-off)
+
+With the default bridge network, some setups (Docker Desktop, OrbStack, rootless Docker, some NAS boxes) make the server see Docker's gateway IP instead of the TV's real IP. Pairing and power-off then fail. Host networking avoids this:
+
+```yaml
+services:
+  comfort-player:
+    network_mode: host   # remove the ports: section, Docker ignores it in this mode
+    environment:
+      - PORT=9090        # the server listens directly on this host port
+```
+
+With host networking, `PORT` is the only port setting. Make sure nothing else on the host is using that port.
 
 ### Volume Mounts
 
 The following directories are mounted as external volumes:
 
 - `./media:/app/media:ro` - Media files (read-only)
-- `./data:/app/data` - Application state and data (read-write)
+- `./data:/app/data` - Application state, settings and the TV-remote certificate (read-write)
+
+## Settings Page & TV Power-Off
+
+Open `http://<server-ip>:8080/settings` to pair TVs/projectors and turn them off remotely. See the main README for the full flow.
+
+- **Outbound access:** the container must reach the TVs on TCP ports **6466** and **6467**. The default bridge network allows this.
+- **Client IP:** with default Docker port publishing, requests from LAN devices keep their real IP, which the device list relies on.
+- **Persistence:** pairing is saved in `./data`. Recreating the container keeps it, as long as the volume is kept.
 
 ## Directory Structure
 
@@ -66,7 +92,9 @@ comfort-player/
 │   └── shows/
 │       └── [your video files]
 ├── data/
-│   └── state.json (auto-created)
+│   ├── state.json (auto-created)
+│   ├── settings.json (auto-created)
+│   └── atvremote/ (auto-created, client cert + key)
 ├── docker-compose.yml
 ├── .env (optional)
 └── ...
@@ -184,6 +212,10 @@ deploy:
 ```bash
 # Backup state file
 cp data/state.json data/state.json.backup
+
+# Backup settings and the TV-remote certificate (losing the certificate means re-pairing every TV)
+cp data/settings.json data/settings.json.backup
+cp -r data/atvremote data/atvremote.backup
 ```
 
 ### Restore State
