@@ -143,10 +143,13 @@ Endpoints:
 |---|---|---|
 | GET | `/api/settings/devices` | List known devices |
 | POST | `/api/settings/devices/{id}` | Update a device, e.g. `{"isProjector": true}` |
+| DELETE | `/api/settings/devices/{id}` | Forget a device |
 | POST | `/api/settings/devices/{id}/pair/start` | Start pairing (TV shows a code) |
 | POST | `/api/settings/devices/{id}/pair/finish` | `{"code": "ABC123"}` |
 | POST | `/api/settings/devices/{id}/power-off` | Turn a device off |
 | POST | `/api/remote/power-off` | Turn off the device making the request |
+
+Behind a reverse proxy (Nginx Proxy Manager, Traefik, Caddy…): the server reads the client IP from `X-Real-IP` / `X-Forwarded-For`, but only when the request comes from a private or loopback address. Without this, every device would appear with the proxy container's IP (e.g. `172.25.0.2`).
 
 Network requirement: the server must reach the TV on TCP ports **6466** and **6467**. Docker's default bridge network is fine for this.
 

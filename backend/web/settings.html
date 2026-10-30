@@ -59,7 +59,9 @@
   .meta { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
   .meta code { font-size: 12px; }
   .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; }
-  label.projector { display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 14px; cursor: pointer; flex-basis: 100%; }
+  .footer { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; flex-basis: 100%; }
+  label.projector { display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 14px; cursor: pointer; }
+  button.link { border: none; background: none; padding: 4px 0; color: var(--muted); font-size: 13px; text-decoration: underline; }
   button {
     font: inherit;
     border-radius: 8px;
@@ -240,7 +242,22 @@
         checkbox.disabled = false;
       }
     });
-    row.append(el('label', { class: 'projector' }, [checkbox, "It's a projector (press power twice to turn off)"]));
+    const forgetBtn = el('button', { class: 'link', text: 'Forget', onclick: async () => {
+      if (!confirm('Forget "' + (d.name || d.ip) + '"? It will reappear (unpaired) the next time it uses the server.')) return;
+      forgetBtn.disabled = true;
+      try {
+        await api('DELETE', devicePath(d.id));
+        openForms.delete(d.id);
+        load();
+      } catch (e) {
+        setMsg('Could not forget: ' + e.message, true);
+        forgetBtn.disabled = false;
+      }
+    }});
+    row.append(el('div', { class: 'footer' }, [
+      el('label', { class: 'projector' }, [checkbox, "It's a projector (press power twice to turn off)"]),
+      forgetBtn,
+    ]));
     row.append(msg);
     return row;
   }

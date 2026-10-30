@@ -48,12 +48,13 @@ RUN chown appuser:appuser /app/main
 # Switch to non-root user
 USER appuser
 
-# Expose port
+# Default port; override with the PORT env var
+ENV PORT=8080
 EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/api/show/info || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT}/api/show/info || exit 1
 
 # Run the application
 CMD ["./main"]

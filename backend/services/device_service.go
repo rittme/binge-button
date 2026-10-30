@@ -103,6 +103,16 @@ func (s *DeviceService) SetProjector(id string, projector bool) (Device, error) 
 	return s.update(id, func(d *Device) { d.IsProjector = projector })
 }
 
+// Delete forgets a device.
+func (s *DeviceService) Delete(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, err := s.get(id); err != nil {
+		return err
+	}
+	return s.store.Delete(devicesNamespace, id)
+}
+
 // SetPaired marks the device as paired or unpaired.
 func (s *DeviceService) SetPaired(id string, paired bool) (Device, error) {
 	return s.update(id, func(d *Device) {
@@ -263,11 +273,30 @@ func (s *DeviceService) findByIP(ip string) (Device, bool) {
 	return best, found
 }
 
-// ClientIP returns the IP address of the request's sender.
+// ClientIP returns the IP address of the request's sender. When the request
+// comes through a reverse proxy on the local network (e.g. Nginx Proxy
+// Manager or Traefik in another container), it uses the client IP the proxy
+// forwards in X-Real-IP / X-Forwarded-For instead of the proxy's own IP.
 func ClientIP(r *http.Request) string {
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	peer, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
-		return r.RemoteAddr
+		peer = r.RemoteAddr
 	}
-	return host
+	peerIP := net.ParseIP(peer)
+	// Only trust forwarding headers from local proxies, so nobody on the
+	// internet can claim to be a device on the LAN.
+	if peerIP == nil || !(peerIP.IsPrivate() || peerIP.IsLoopback()) {
+		return peer
+	}
+	if ip := net.ParseIP(strings.TrimSpace(r.Header.Get("X-Real-IP"))); ip != nil {
+		return ip.String()
+	}
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		// "client, proxy1, proxy2": the first entry is the original client.
+		first, _, _ := strings.Cut(xff, ",")
+		if ip := net.ParseIP(strings.TrimSpace(first)); ip != nil {
+			return ip.String()
+		}
+	}
+	return peer
 }

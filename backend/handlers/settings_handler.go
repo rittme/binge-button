@@ -56,6 +56,15 @@ func (h *SettingsHandler) UpdateDevice(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, d)
 }
 
+// DeleteDevice handles DELETE /api/settings/devices/{id}
+func (h *SettingsHandler) DeleteDevice(w http.ResponseWriter, r *http.Request) {
+	if err := h.devices.Delete(mux.Vars(r)["id"]); err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"success": true})
+}
+
 // StartPairing handles POST /api/settings/devices/{id}/pair/start
 func (h *SettingsHandler) StartPairing(w http.ResponseWriter, r *http.Request) {
 	if err := h.remote.StartPairing(r.Context(), mux.Vars(r)["id"]); err != nil {
