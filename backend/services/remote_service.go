@@ -29,7 +29,8 @@ const (
 	// How long to wait for the device to report "off" after the presses.
 	// The connection stays open meanwhile: closing it right after the last
 	// press can drop that press.
-	confirmOffTimeout = 4 * time.Second
+	// Projectors can take several seconds to report off while shutting down.
+	confirmOffTimeout = 10 * time.Second
 
 	powerKey = "KEYCODE_POWER"
 )
