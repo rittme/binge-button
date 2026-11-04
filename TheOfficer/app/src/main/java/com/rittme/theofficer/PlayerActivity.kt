@@ -97,6 +97,8 @@ class PlayerActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "PlayerActivity"
+        private const val DEBUG_SHUTDOWN_PRESSES = 5
+        private const val DEBUG_SHUTDOWN_WINDOW_MS = 3_000L
         private const val AUTO_HIDE_DELAY_MS = 4000L
         private const val DIM_STEP = 0.1f
         private const val DIM_MAX = 0.9f
@@ -672,6 +674,18 @@ class PlayerActivity : AppCompatActivity() {
         dimOverlayView?.alpha = 1.0f
         hideSystemUi()
 
+        // Ask the server to turn the TV/projector off first. Locking first could
+        // make the TV report "off" and the server would skip the power key.
+        lifecycleScope.launch {
+            if (viewModel.requestPowerOff()) {
+                Log.d(TAG, "Device powered off by server")
+            } else if (shutdownActive) {
+                lockScreenFallback()
+            }
+        }
+    }
+
+    private fun lockScreenFallback() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             if (SleepAccessibilityService.lockScreen()) {
                 Log.d(TAG, "Screen locked via accessibility service")
@@ -837,11 +851,41 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
+    // Debug builds only: pressing Up 5 times quickly runs the sleep-timer shutdown now.
+    private val debugUpPresses = ArrayDeque<Long>()
+
+    private fun isDebugShutdownSequence(): Boolean {
+        val now = System.currentTimeMillis()
+        debugUpPresses.addLast(now)
+        while (debugUpPresses.isNotEmpty() && now - debugUpPresses.first() > DEBUG_SHUTDOWN_WINDOW_MS) {
+            debugUpPresses.removeFirst()
+        }
+        if (debugUpPresses.size >= DEBUG_SHUTDOWN_PRESSES) {
+            debugUpPresses.clear()
+            return true
+        }
+        return false
+    }
+
+    private fun triggerDebugShutdown() {
+        Log.d(TAG, "Debug shortcut: triggering shutdown now")
+        Toast.makeText(this, "Debug: turning off…", Toast.LENGTH_SHORT).show()
+        viewModel.cancelShutdownTimer()
+        cancelShutdownFadeOut()
+        executeDeviceSleep()
+    }
+
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.action == KeyEvent.ACTION_DOWN && shutdownFadeJob?.isActive == true) {
             if (handleShutdownFadeInterrupt()) return true
         }
         val overlayVisible = episodePickerOverlay?.visibility == View.VISIBLE
+        if (BuildConfig.DEBUG && !overlayVisible && event.action == KeyEvent.ACTION_DOWN &&
+            event.keyCode == KeyEvent.KEYCODE_DPAD_UP && event.repeatCount == 0 &&
+            isDebugShutdownSequence()) {
+            triggerDebugShutdown()
+            return true
+        }
         if (overlayVisible && event.action == KeyEvent.ACTION_DOWN) {
             when (event.keyCode) {
                 KeyEvent.KEYCODE_DPAD_UP -> {

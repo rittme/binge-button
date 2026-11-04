@@ -5,9 +5,11 @@ import androidx.lifecycle.*
 import com.rittme.theofficer.data.EpisodeInfo
 import com.rittme.theofficer.data.PlaybackStateUpdateRequest
 import com.rittme.theofficer.network.ApiService
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 data class PlayerUiState(
     val currentEpisode: EpisodeInfo? = null,
@@ -38,6 +40,9 @@ class PlayerViewModel(private val apiService: ApiService) : ViewModel() {
         private const val MAX_RETRY_ATTEMPTS = 5
         private const val INITIAL_RETRY_DELAY_MS = 2000L // 2 seconds
         private const val SHUTDOWN_TIMER_UPDATE_INTERVAL_MS = 60_000L // 1 minute
+        // Server: up to 5s to connect, the projector presses, then up to 10s
+        // (twice, with the extra press) waiting for the device to report off.
+        private const val POWER_OFF_TIMEOUT_MS = 25_000L
     }
 
     init {
@@ -259,6 +264,36 @@ class PlayerViewModel(private val apiService: ApiService) : ViewModel() {
             } catch (e: Exception) {
                 Log.e(TAG, "Error updating progress: ", e)
             }
+        }
+    }
+
+    /**
+     * Asks the server to power off this TV/projector over the network remote.
+     * Returns true when the server turned it off (or it was already off).
+     * Fails (404 unknown device, 409 not paired, 502 unreachable, timeout) return false.
+     */
+    suspend fun requestPowerOff(): Boolean {
+        return try {
+            val response = withTimeoutOrNull(POWER_OFF_TIMEOUT_MS) { apiService.powerOff() }
+            when {
+                response == null -> {
+                    Log.w(TAG, "Power-off request timed out")
+                    false
+                }
+                response.isSuccessful -> {
+                    Log.d(TAG, "Power-off result: ${response.body()?.result}")
+                    true
+                }
+                else -> {
+                    Log.w(TAG, "Power-off failed: ${response.code()} ${response.errorBody()?.string()}")
+                    false
+                }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.e(TAG, "Error requesting power-off", e)
+            false
         }
     }
 

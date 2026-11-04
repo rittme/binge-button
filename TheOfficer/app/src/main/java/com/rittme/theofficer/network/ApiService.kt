@@ -1,6 +1,7 @@
 package com.rittme.theofficer.network
 
 import com.rittme.theofficer.data.PlaybackStateUpdateRequest
+import com.rittme.theofficer.data.PowerOffResponse
 import com.rittme.theofficer.data.ShowInfoResponse
 import retrofit2.Response
 import retrofit2.Retrofit
@@ -52,4 +53,8 @@ interface ApiService {
 
     @POST("api/show/state")
     suspend fun updatePlaybackState(@Body state: PlaybackStateUpdateRequest): Response<Unit> // Void response
+
+    // Asks the server to turn off the TV/projector this app runs on (found by IP).
+    @POST("api/remote/power-off")
+    suspend fun powerOff(): Response<PowerOffResponse>
 }
