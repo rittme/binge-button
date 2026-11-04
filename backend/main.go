@@ -68,6 +68,7 @@ func main() {
 	r.HandleFunc("/settings", settingsHandler.SettingsPage).Methods("GET")
 	r.HandleFunc("/api/settings/devices", settingsHandler.ListDevices).Methods("GET")
 	r.HandleFunc("/api/settings/devices/{id}", settingsHandler.UpdateDevice).Methods("POST")
+	r.HandleFunc("/api/settings/devices/{id}", settingsHandler.DeleteDevice).Methods("DELETE")
 	r.HandleFunc("/api/settings/devices/{id}/pair/start", settingsHandler.StartPairing).Methods("POST")
 	r.HandleFunc("/api/settings/devices/{id}/pair/finish", settingsHandler.FinishPairing).Methods("POST")
 	r.HandleFunc("/api/settings/devices/{id}/power-off", settingsHandler.PowerOffDevice).Methods("POST")
@@ -155,7 +156,7 @@ func createLoggingMiddleware() func(http.Handler) http.Handler {
 			start := time.Now()
 			
 			// Log incoming request
-			log.Printf("REQUEST: %s %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
+			log.Printf("REQUEST: %s %s from %s (client %s)", r.Method, r.URL.Path, r.RemoteAddr, services.ClientIP(r))
 			
 			// Create a response writer wrapper to capture status code
 		 wrapped := &responseWriter{ResponseWriter: w, statusCode: http.StatusOK}

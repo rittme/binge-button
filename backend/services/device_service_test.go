@@ -137,3 +137,43 @@ func TestSeenIgnoresLoopback(t *testing.T) {
 		t.Fatal("loopback request should not create a device")
 	}
 }
+
+func TestClientIP(t *testing.T) {
+	cases := []struct {
+		name, remote, realIP, xff, want string
+	}{
+		{"direct", "192.168.1.20:5000", "", "", "192.168.1.20"},
+		{"proxy X-Real-IP", "172.25.0.2:5000", "192.168.1.20", "", "192.168.1.20"},
+		{"proxy X-Forwarded-For chain", "172.25.0.2:5000", "", "192.168.1.20, 172.25.0.3", "192.168.1.20"},
+		{"proxy without headers", "172.25.0.2:5000", "", "", "172.25.0.2"},
+		{"garbage header ignored", "172.25.0.2:5000", "not-an-ip", "", "172.25.0.2"},
+		{"public peer can't spoof", "203.0.113.9:5000", "192.168.1.20", "192.168.1.20", "203.0.113.9"},
+	}
+	for _, c := range cases {
+		r := httptest.NewRequest("GET", "/api/show/info", nil)
+		r.RemoteAddr = c.remote
+		if c.realIP != "" {
+			r.Header.Set("X-Real-IP", c.realIP)
+		}
+		if c.xff != "" {
+			r.Header.Set("X-Forwarded-For", c.xff)
+		}
+		if got := ClientIP(r); got != c.want {
+			t.Errorf("%s: got %s, want %s", c.name, got, c.want)
+		}
+	}
+}
+
+func TestDelete(t *testing.T) {
+	s, _ := newTestDeviceService(t)
+	seen(s, "172.25.0.2")
+	if err := s.Delete("ip:172.25.0.2"); err != nil {
+		t.Fatal(err)
+	}
+	if len(s.List()) != 0 {
+		t.Fatal("device not deleted")
+	}
+	if err := s.Delete("ip:172.25.0.2"); err != ErrDeviceNotFound {
+		t.Fatalf("expected ErrDeviceNotFound, got %v", err)
+	}
+}

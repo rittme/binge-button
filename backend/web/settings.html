@@ -59,7 +59,20 @@
   .meta { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
   .meta code { font-size: 12px; }
   .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; }
-  label.projector { display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 14px; cursor: pointer; flex-basis: 100%; }
+  .footer { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; flex-basis: 100%; }
+  label.projector { display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 14px; cursor: pointer; }
+  .projector-opts { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+  label.delay { display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 14px; }
+  label.delay input {
+    font: inherit;
+    width: 6em;
+    padding: 4px 8px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+  }
+  button.link { border: none; background: none; padding: 4px 0; color: var(--muted); font-size: 13px; text-decoration: underline; }
   button {
     font: inherit;
     border-radius: 8px;
@@ -190,7 +203,11 @@
         setMsg('Sending…');
         try {
           const r = await api('POST', devicePath(d.id) + '/power-off');
-          setMsg(r.result === 'already_off' ? 'Already off.' : 'Turned off.');
+          const text = {
+            already_off: 'Already off.',
+            unconfirmed: 'Sent, but the device still reports on. Try a longer delay.',
+          }[r.result] || 'Turned off.';
+          setMsg(text, r.result === 'unconfirmed');
         } catch (e) {
           setMsg(e.message, true);
           if (e.status === 409) load(); // TV forgot the pairing
@@ -225,6 +242,31 @@
       row.append(form);
     }
 
+    const delayInput = el('input', { type: 'number', min: '0', max: '10000', step: '100', placeholder: '1000', 'aria-label': 'Delay between presses in milliseconds' });
+    delayInput.value = d.powerDelayMs || '';
+    const delayLabel = el('label', { class: 'delay' }, ['Delay between presses', delayInput, 'ms']);
+    delayLabel.hidden = !d.isProjector;
+    delayInput.addEventListener('change', async () => {
+      const raw = delayInput.value.trim();
+      const ms = raw === '' ? 0 : Math.round(Number(raw));
+      if (!Number.isFinite(ms) || ms < 0 || ms > 10000) {
+        setMsg('Delay must be between 0 and 10000 ms.', true);
+        delayInput.value = d.powerDelayMs || '';
+        return;
+      }
+      delayInput.disabled = true;
+      try {
+        await api('POST', devicePath(d.id), { powerDelayMs: ms });
+        d.powerDelayMs = ms;
+        setMsg('Saved.');
+      } catch (e) {
+        delayInput.value = d.powerDelayMs || '';
+        setMsg('Could not save: ' + e.message, true);
+      } finally {
+        delayInput.disabled = false;
+      }
+    });
+
     const checkbox = el('input', { type: 'checkbox' });
     checkbox.checked = !!d.isProjector;
     checkbox.addEventListener('change', async () => {
@@ -233,6 +275,7 @@
       try {
         await api('POST', devicePath(d.id), { isProjector: wanted });
         d.isProjector = wanted;
+        delayLabel.hidden = !wanted;
       } catch (e) {
         checkbox.checked = !wanted;
         setMsg('Could not save: ' + e.message, true);
@@ -240,7 +283,25 @@
         checkbox.disabled = false;
       }
     });
-    row.append(el('label', { class: 'projector' }, [checkbox, "It's a projector (press power twice to turn off)"]));
+    const forgetBtn = el('button', { class: 'link', text: 'Forget', onclick: async () => {
+      if (!confirm('Forget "' + (d.name || d.ip) + '"? It will reappear (unpaired) the next time it uses the server.')) return;
+      forgetBtn.disabled = true;
+      try {
+        await api('DELETE', devicePath(d.id));
+        openForms.delete(d.id);
+        load();
+      } catch (e) {
+        setMsg('Could not forget: ' + e.message, true);
+        forgetBtn.disabled = false;
+      }
+    }});
+    row.append(el('div', { class: 'footer' }, [
+      el('div', { class: 'projector-opts' }, [
+        el('label', { class: 'projector' }, [checkbox, "It's a projector (press power twice to turn off)"]),
+        delayLabel,
+      ]),
+      forgetBtn,
+    ]));
     row.append(msg);
     return row;
   }

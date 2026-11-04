@@ -24,3 +24,10 @@ data class PlaybackStateUpdateRequest(
     val episodeId: String,
     val playbackTimeSeconds: Long
 )
+
+// Response from the server's remote power-off endpoint
+data class PowerOffResponse(
+    val success: Boolean?,
+    val result: String?, // "sent" or "already_off"
+    val error: String?
+)

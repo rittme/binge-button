@@ -134,8 +134,8 @@ Open `http://<server>:8080/settings` in a browser.
 The page lists every device that has called `/api/show/*`. If a device is an Android TV, its name and MAC address are read from its remote service, so it keeps its settings when its IP changes.
 
 - **Pair** pairs the server with a device: the TV shows a 6-character code, and you type it into the page. Once paired, the server can act as a network remote for that TV, using the Android TV Remote protocol v2 via [atvremote](https://github.com/jkiddo/atvremote).
-- **It's a projector** makes power-off press POWER twice, 200 ms apart, because projectors ask for confirmation.
-- **Turn off** sends the power-off to the device right away. It does nothing if the device is already off.
+- **It's a projector** makes power-off press POWER twice: the first opens the power menu, the second confirms. The wait between them defaults to 1000 ms and can be changed per device (**Delay between presses**) if the second press arrives before the menu is ready.
+- **Turn off** sends the power-off to the device right away. It does nothing if the device is already off. After pressing, the server keeps the connection open for up to 10 seconds and waits for the device to report "off". A projector that stays on gets one extra POWER press. The response `result` is `sent` (confirmed off), `already_off`, or `unconfirmed` (keys sent, but the device still reports on).
 
 Endpoints:
 
@@ -143,10 +143,13 @@ Endpoints:
 |---|---|---|
 | GET | `/api/settings/devices` | List known devices |
 | POST | `/api/settings/devices/{id}` | Update a device, e.g. `{"isProjector": true}` |
+| DELETE | `/api/settings/devices/{id}` | Forget a device |
 | POST | `/api/settings/devices/{id}/pair/start` | Start pairing (TV shows a code) |
 | POST | `/api/settings/devices/{id}/pair/finish` | `{"code": "ABC123"}` |
 | POST | `/api/settings/devices/{id}/power-off` | Turn a device off |
-| POST | `/api/remote/power-off` | Turn off the device making the request |
+| POST | `/api/remote/power-off` | Turn off the device making the request (used by TheOfficer's sleep timer) |
+
+Behind a reverse proxy (Nginx Proxy Manager, Traefik, Caddy…): the server reads the client IP from `X-Real-IP` / `X-Forwarded-For`, but only when the request comes from a private or loopback address. Without this, every device would appear with the proxy container's IP (e.g. `172.25.0.2`).
 
 Network requirement: the server must reach the TV on TCP ports **6466** and **6467**. Docker's default bridge network is fine for this.
 

@@ -3,10 +3,14 @@ services:
   comfort-player:
     image: ghcr.io/rittme/comfort-player:latest
     container_name: comfort-player
+    # To let the server reach TVs on your LAN and see their real IPs, you can
+    # use host networking instead of the ports mapping (Linux hosts). Docker
+    # then ignores ports:, and PORT alone picks the port:
+    # network_mode: host
     ports:
-      - "8080:8080"
+      - "${PORT:-8080}:${PORT:-8080}"
     environment:
-      - PORT=8080
+      - PORT=${PORT:-8080}
       - MEDIA_DIR=/app/media
       - SEASONS_DIR=/app/media/shows
       - STATE_FILE=/app/data/state.json
@@ -20,7 +24,7 @@ services:
       - ./data:/app/data # Mount data folder as external volume for persistent state
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/api/show/info"]
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:$${PORT:-8080}/api/show/info || exit 1"]
       interval: 60s
       timeout: 10s
       retries: 3

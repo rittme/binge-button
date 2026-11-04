@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -38,10 +39,15 @@ func (h *SettingsHandler) ListDevices(w http.ResponseWriter, r *http.Request) {
 // UpdateDevice handles POST /api/settings/devices/{id}
 func (h *SettingsHandler) UpdateDevice(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		IsProjector *bool `json:"isProjector"`
+		IsProjector  *bool `json:"isProjector"`
+		PowerDelayMs *int  `json:"powerDelayMs"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid JSON")
+		return
+	}
+	if req.PowerDelayMs != nil && (*req.PowerDelayMs < 0 || *req.PowerDelayMs > services.MaxPowerDelayMs) {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("powerDelayMs must be between 0 and %d", services.MaxPowerDelayMs))
 		return
 	}
 	id := mux.Vars(r)["id"]
@@ -49,11 +55,23 @@ func (h *SettingsHandler) UpdateDevice(w http.ResponseWriter, r *http.Request) {
 	if err == nil && req.IsProjector != nil {
 		d, err = h.devices.SetProjector(id, *req.IsProjector)
 	}
+	if err == nil && req.PowerDelayMs != nil {
+		d, err = h.devices.SetPowerDelay(id, *req.PowerDelayMs)
+	}
 	if err != nil {
 		h.writeServiceError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, d)
+}
+
+// DeleteDevice handles DELETE /api/settings/devices/{id}
+func (h *SettingsHandler) DeleteDevice(w http.ResponseWriter, r *http.Request) {
+	if err := h.devices.Delete(mux.Vars(r)["id"]); err != nil {
+		h.writeServiceError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"success": true})
 }
 
 // StartPairing handles POST /api/settings/devices/{id}/pair/start
@@ -95,11 +113,15 @@ func (h *SettingsHandler) PowerOffDevice(w http.ResponseWriter, r *http.Request)
 // PowerOffCaller handles POST /api/remote/power-off: turns off the device
 // that sent the request (the TV running the app).
 func (h *SettingsHandler) PowerOffCaller(w http.ResponseWriter, r *http.Request) {
-	d, err := h.devices.FindByIP(services.ClientIP(r))
+	ip := services.ClientIP(r)
+	d, err := h.devices.FindByIP(ip)
 	if err != nil {
+		log.Printf("SettingsHandler: power-off requested from %s, but no device has that IP (check /settings)", ip)
 		h.writeServiceError(w, err)
 		return
 	}
+	log.Printf("SettingsHandler: power-off requested from %s -> device %s (%s, paired=%v, projector=%v)",
+		ip, d.ID, d.Name, d.Paired, d.IsProjector)
 	h.powerOff(w, r, d.ID)
 }
 
@@ -126,9 +148,7 @@ func (h *SettingsHandler) writeServiceError(w http.ResponseWriter, err error) {
 	case errors.Is(err, services.ErrUnreachable):
 		status = http.StatusBadGateway
 	}
-	if status == http.StatusInternalServerError {
-		log.Printf("SettingsHandler: %v", err)
-	}
+	log.Printf("SettingsHandler: %d %v", status, err)
 	writeError(w, status, err.Error())
 }
 
