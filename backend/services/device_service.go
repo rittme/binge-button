@@ -40,6 +40,19 @@ type Device struct {
 	Paired      bool   `json:"paired"`
 	PairedAt    int64  `json:"pairedAt,omitempty"`
 	IsProjector bool   `json:"isProjector"`
+	// Wait between the two POWER presses for a projector, in ms (0 = default).
+	PowerDelayMs int `json:"powerDelayMs,omitempty"`
+}
+
+// MaxPowerDelayMs caps the projector delay so a typo can't stall power-off.
+const MaxPowerDelayMs = 10_000
+
+// PowerDelay returns the wait between the two POWER presses for a projector.
+func (d Device) PowerDelay() time.Duration {
+	if d.PowerDelayMs > 0 {
+		return time.Duration(d.PowerDelayMs) * time.Millisecond
+	}
+	return DefaultProjectorPowerDelay
 }
 
 // IdentifyFunc looks up a device's name and MAC address by IP.
@@ -101,6 +114,11 @@ func (s *DeviceService) FindByIP(ip string) (Device, error) {
 // SetProjector sets whether the device is a projector.
 func (s *DeviceService) SetProjector(id string, projector bool) (Device, error) {
 	return s.update(id, func(d *Device) { d.IsProjector = projector })
+}
+
+// SetPowerDelay sets the wait between the two POWER presses (0 = default).
+func (s *DeviceService) SetPowerDelay(id string, ms int) (Device, error) {
+	return s.update(id, func(d *Device) { d.PowerDelayMs = ms })
 }
 
 // Delete forgets a device.
@@ -220,6 +238,9 @@ func mergeDevices(a, b Device) Device {
 		a.Paired, a.PairedAt = true, b.PairedAt
 	}
 	a.IsProjector = a.IsProjector || b.IsProjector
+	if a.PowerDelayMs == 0 {
+		a.PowerDelayMs = b.PowerDelayMs
+	}
 	return a
 }
 

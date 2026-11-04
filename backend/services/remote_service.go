@@ -23,10 +23,21 @@ const (
 	pairingFinishTimeout = 15 * time.Second
 	connectTimeout       = 5 * time.Second
 
-	// Projectors usually ask "press POWER again to turn off".
-	projectorPowerConfirmDelay = 200 * time.Millisecond
-	powerKey                   = "KEYCODE_POWER"
+	// Short pause after connecting, so the device has finished its own
+	// start-up messages before the first key press.
+	settleAfterConnect = 300 * time.Millisecond
+	// How long to wait for the device to report "off" after the presses.
+	// The connection stays open meanwhile: closing it right after the last
+	// press can drop that press.
+	confirmOffTimeout = 4 * time.Second
+
+	powerKey = "KEYCODE_POWER"
 )
+
+// DefaultProjectorPowerDelay is the wait between the two POWER presses for a
+// projector: the first opens its power menu, the second confirms. Too short
+// and the second press arrives before the menu is ready.
+const DefaultProjectorPowerDelay = time.Second
 
 var (
 	// ErrNoPairingSession means pairing wasn't started, expired, or was cancelled on the TV.
@@ -43,8 +54,9 @@ var (
 type PowerOffResult string
 
 const (
-	PowerOffSent       PowerOffResult = "sent"
-	PowerOffAlreadyOff PowerOffResult = "already_off"
+	PowerOffSent        PowerOffResult = "sent"        // device reported off
+	PowerOffAlreadyOff  PowerOffResult = "already_off" // nothing was sent
+	PowerOffUnconfirmed PowerOffResult = "unconfirmed" // keys sent, device still reports on
 )
 
 type pairingSession struct {
@@ -185,6 +197,18 @@ func (s *RemoteService) PowerOff(ctx context.Context, deviceID string) (PowerOff
 	}
 	defer r.Disconnect()
 
+	// The device reports its power state on this connection; watch for "off".
+	offCh := make(chan struct{}, 1)
+	removeCb := r.AddIsOnUpdatedCallback(func(on bool) {
+		if !on {
+			select {
+			case offCh <- struct{}{}:
+			default:
+			}
+		}
+	})
+	defer removeCb()
+
 	ctx, cancel := context.WithTimeout(ctx, connectTimeout)
 	defer cancel()
 	if err := r.Connect(ctx); err != nil {
@@ -204,11 +228,52 @@ func (s *RemoteService) PowerOff(ctx context.Context, deviceID string) (PowerOff
 		log.Printf("RemoteService: %s is already off", deviceID)
 		return PowerOffAlreadyOff, nil
 	}
-	if err := sendPowerOff(r, d.IsProjector, time.Sleep); err != nil {
+	time.Sleep(settleAfterConnect)
+
+	waitOff := func() bool {
+		select {
+		case <-offCh:
+			return true
+		case <-time.After(confirmOffTimeout):
+			return false
+		}
+	}
+	desc := "TV"
+	if d.IsProjector {
+		desc = fmt.Sprintf("projector, %v between presses", d.PowerDelay())
+	}
+	confirmed, err := powerOffAndConfirm(r, d.IsProjector, d.PowerDelay(), time.Sleep, waitOff)
+	if err != nil {
 		return "", fmt.Errorf("%w: %v", ErrUnreachable, err)
 	}
-	log.Printf("RemoteService: power off sent to %s (projector=%v)", deviceID, d.IsProjector)
+	if !confirmed {
+		log.Printf("RemoteService: power off sent to %s (%s), but it still reports on", deviceID, desc)
+		return PowerOffUnconfirmed, nil
+	}
+	log.Printf("RemoteService: %s turned off (%s)", deviceID, desc)
 	return PowerOffSent, nil
+}
+
+// powerOffAndConfirm sends the power-off presses and waits for the device to
+// report off. A projector that stays on (a press was missed, so its power menu
+// is open or was never shown) gets one more POWER press.
+func powerOffAndConfirm(k keySender, projector bool, delay time.Duration, sleep func(time.Duration), waitOff func() bool) (bool, error) {
+	if err := sendPowerOff(k, projector, delay, sleep); err != nil {
+		return false, err
+	}
+	if waitOff() {
+		return true, nil
+	}
+	if !projector {
+		return false, nil
+	}
+	log.Printf("RemoteService: projector still on, pressing POWER once more")
+	if err := k.SendKeyCommand(powerKey); err != nil {
+		// The device dropped the connection: most likely it just went off.
+		log.Printf("RemoteService: connection closed after the extra press, assuming off: %v", err)
+		return true, nil
+	}
+	return waitOff(), nil
 }
 
 type keySender interface {
@@ -217,14 +282,14 @@ type keySender interface {
 
 // sendPowerOff presses POWER once for a TV, or twice (with a short pause)
 // for a projector, which asks for confirmation.
-func sendPowerOff(k keySender, projector bool, sleep func(time.Duration)) error {
+func sendPowerOff(k keySender, projector bool, delay time.Duration, sleep func(time.Duration)) error {
 	if err := k.SendKeyCommand(powerKey); err != nil {
 		return err
 	}
 	if !projector {
 		return nil
 	}
-	sleep(projectorPowerConfirmDelay)
+	sleep(delay)
 	return k.SendKeyCommand(powerKey)
 }
 

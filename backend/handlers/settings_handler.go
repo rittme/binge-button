@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -38,16 +39,24 @@ func (h *SettingsHandler) ListDevices(w http.ResponseWriter, r *http.Request) {
 // UpdateDevice handles POST /api/settings/devices/{id}
 func (h *SettingsHandler) UpdateDevice(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		IsProjector *bool `json:"isProjector"`
+		IsProjector  *bool `json:"isProjector"`
+		PowerDelayMs *int  `json:"powerDelayMs"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid JSON")
+		return
+	}
+	if req.PowerDelayMs != nil && (*req.PowerDelayMs < 0 || *req.PowerDelayMs > services.MaxPowerDelayMs) {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("powerDelayMs must be between 0 and %d", services.MaxPowerDelayMs))
 		return
 	}
 	id := mux.Vars(r)["id"]
 	d, err := h.devices.Get(id)
 	if err == nil && req.IsProjector != nil {
 		d, err = h.devices.SetProjector(id, *req.IsProjector)
+	}
+	if err == nil && req.PowerDelayMs != nil {
+		d, err = h.devices.SetPowerDelay(id, *req.PowerDelayMs)
 	}
 	if err != nil {
 		h.writeServiceError(w, err)
