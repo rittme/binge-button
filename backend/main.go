@@ -156,7 +156,7 @@ func createLoggingMiddleware() func(http.Handler) http.Handler {
 			start := time.Now()
 			
 			// Log incoming request
-			log.Printf("REQUEST: %s %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
+			log.Printf("REQUEST: %s %s from %s (client %s)", r.Method, r.URL.Path, r.RemoteAddr, services.ClientIP(r))
 			
 			// Create a response writer wrapper to capture status code
 		 wrapped := &responseWriter{ResponseWriter: w, statusCode: http.StatusOK}

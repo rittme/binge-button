@@ -92,6 +92,8 @@ An Android app can't turn off the TV it runs on. The server does it instead, by 
 4. If the device is a projector, tick **It's a projector**. Power-off then presses POWER twice, 200 ms apart, to get past the confirmation prompt.
 5. Click **Turn off** to test.
 
+Once paired, TheOfficer's sleep timer uses this automatically. When the fade-out ends, the app calls `POST /api/remote/power-off`, and the server turns that device off. If the device isn't paired or can't be reached, the app falls back to locking the screen (needs the accessibility service).
+
 Notes:
 - **Device identity:** Android TVs are identified by MAC address, read from their remote service. They keep their pairing and settings when their IP changes. Other devices are tracked by IP.
 - **Network:** the server must reach the TV on TCP ports **6466** and **6467**.

@@ -147,7 +147,7 @@ Endpoints:
 | POST | `/api/settings/devices/{id}/pair/start` | Start pairing (TV shows a code) |
 | POST | `/api/settings/devices/{id}/pair/finish` | `{"code": "ABC123"}` |
 | POST | `/api/settings/devices/{id}/power-off` | Turn a device off |
-| POST | `/api/remote/power-off` | Turn off the device making the request |
+| POST | `/api/remote/power-off` | Turn off the device making the request (used by TheOfficer's sleep timer) |
 
 Behind a reverse proxy (Nginx Proxy Manager, Traefik, Caddy…): the server reads the client IP from `X-Real-IP` / `X-Forwarded-For`, but only when the request comes from a private or loopback address. Without this, every device would appear with the proxy container's IP (e.g. `172.25.0.2`).
 

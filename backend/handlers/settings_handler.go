@@ -104,11 +104,15 @@ func (h *SettingsHandler) PowerOffDevice(w http.ResponseWriter, r *http.Request)
 // PowerOffCaller handles POST /api/remote/power-off: turns off the device
 // that sent the request (the TV running the app).
 func (h *SettingsHandler) PowerOffCaller(w http.ResponseWriter, r *http.Request) {
-	d, err := h.devices.FindByIP(services.ClientIP(r))
+	ip := services.ClientIP(r)
+	d, err := h.devices.FindByIP(ip)
 	if err != nil {
+		log.Printf("SettingsHandler: power-off requested from %s, but no device has that IP (check /settings)", ip)
 		h.writeServiceError(w, err)
 		return
 	}
+	log.Printf("SettingsHandler: power-off requested from %s -> device %s (%s, paired=%v, projector=%v)",
+		ip, d.ID, d.Name, d.Paired, d.IsProjector)
 	h.powerOff(w, r, d.ID)
 }
 
@@ -135,9 +139,7 @@ func (h *SettingsHandler) writeServiceError(w http.ResponseWriter, err error) {
 	case errors.Is(err, services.ErrUnreachable):
 		status = http.StatusBadGateway
 	}
-	if status == http.StatusInternalServerError {
-		log.Printf("SettingsHandler: %v", err)
-	}
+	log.Printf("SettingsHandler: %d %v", status, err)
 	writeError(w, status, err.Error())
 }
 
